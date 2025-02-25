@@ -38,6 +38,8 @@ dependencies:
   provider: ^6.1.2
   cached_network_image: ^3.4.1
   flutter_dotenv: ^5.2.1
+  shared_preferences: ^2.5.2
+  flutter_riverpod: ^2.6.1
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +77,14 @@ flutter:
   # in this "flutter" section. Each entry in this list should have a
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
+
+  fonts:
+    - family: MPLUSRounded1c
+      fonts:
+        - asset: assets/fonts/MPLUSRounded1c-Regular.ttf
+        - asset: assets/fonts/MPLUSRounded1c-Bold.ttf
+          weight: 700
+
   # example:
   # fonts:
   #   - family: Schyler
