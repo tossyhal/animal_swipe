@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/animal_providers.dart';
 import '../widgets/swipe_card.dart';
-import 'settings_screen.dart';
+import 'start_screen.dart';
 
 class SwipeScreen extends ConsumerStatefulWidget {
   const SwipeScreen({super.key});
@@ -31,12 +31,13 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
         title: const Text('AnimalSwipe'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.pets),
+            tooltip: '動物の種類を変更',
             onPressed: () {
-              // 設定画面へ遷移
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              // スタート画面へ戻る
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const StartScreen()),
+              );
             },
           ),
         ],
