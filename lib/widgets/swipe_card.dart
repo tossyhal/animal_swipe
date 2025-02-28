@@ -162,7 +162,7 @@ class _SwipeCardState extends State<SwipeCard>
                 Card(
                   elevation: 8,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20), // 丸みを増加
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: SizedBox(
@@ -171,53 +171,166 @@ class _SwipeCardState extends State<SwipeCard>
                     child: Column(
                       children: [
                         Expanded(
-                          child: Image.network(
-                            widget.image.url,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value:
-                                      loadingProgress.expectedTotalBytes != null
-                                          ? loadingProgress
-                                                  .cumulativeBytesLoaded /
-                                              loadingProgress
-                                                  .expectedTotalBytes!
-                                          : null,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Hero(
+                                tag: 'animal_image_${widget.image.id}',
+                                child: Image.network(
+                                  widget.image.url,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  loadingBuilder: (
+                                    context,
+                                    child,
+                                    loadingProgress,
+                                  ) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        value:
+                                            loadingProgress
+                                                        .expectedTotalBytes !=
+                                                    null
+                                                ? loadingProgress
+                                                        .cumulativeBytesLoaded /
+                                                    loadingProgress
+                                                        .expectedTotalBytes!
+                                                : null,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.error_outline,
+                                            size: 48,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.error,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '画像の読み込みに失敗しました',
+                                            style: TextStyle(
+                                              fontFamily: 'MPLUSRounded1c',
+                                              color:
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
                                 ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Center(
-                                child: Icon(Icons.error, size: 48),
-                              );
-                            },
+                              ),
+                              // 画像の上部に半透明のグラデーションを追加
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.4),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // 画像の下部に半透明のグラデーションを追加
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.4),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(12.0),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(20),
+                              bottomRight: Radius.circular(20),
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(16.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (widget.image.description != null)
                                 Text(
                                   widget.image.description!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
+                                    fontFamily: 'MPLUSRounded1c',
                                     fontWeight: FontWeight.bold,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               const SizedBox(height: 4),
-                              Text(
-                                '種類: ${widget.image.type.toUpperCase()}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
-                                ),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      widget.image.type.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontFamily: 'MPLUSRounded1c',
+                                        fontWeight: FontWeight.w500,
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -233,15 +346,32 @@ class _SwipeCardState extends State<SwipeCard>
                     right: isLiked ? 20 : null,
                     left: isLiked ? null : 20,
                     child: Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isLiked ? Colors.pink : Colors.grey,
+                        color:
+                            isLiked
+                                ? Theme.of(
+                                  context,
+                                ).colorScheme.secondary.withValues(alpha: 0.9)
+                                : Theme.of(
+                                  context,
+                                ).colorScheme.error.withValues(alpha: 0.9),
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isLiked
+                                    ? Theme.of(context).colorScheme.secondary
+                                    : Theme.of(context).colorScheme.error)
+                                .withValues(alpha: 0.5),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
                       child: Icon(
                         isLiked ? Icons.favorite : Icons.close,
                         color: Colors.white,
-                        size: 32,
+                        size: 36,
                       ),
                     ),
                   ),
