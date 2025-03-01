@@ -40,6 +40,7 @@ dependencies:
   flutter_dotenv: ^5.2.1
   shared_preferences: ^2.5.2
   flutter_riverpod: ^2.6.1
+  mockito: ^5.4.5
 
 dev_dependencies:
   flutter_test:
