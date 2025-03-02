@@ -43,6 +43,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
               label: const Text(
                 'ホームに戻る',
                 style: TextStyle(
+                  fontSize: 14,
                   color: Colors.white,
                   fontFamily: 'MPLUSRounded1c',
                 ),

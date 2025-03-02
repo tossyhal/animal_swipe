@@ -41,6 +41,7 @@ dependencies:
   shared_preferences: ^2.5.2
   flutter_riverpod: ^2.6.1
   mockito: ^5.4.5
+  flutter_launcher_icons: ^0.14.3
 
 dev_dependencies:
   flutter_test:
@@ -101,3 +102,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: 'assets/images/icon.png'
+  adaptive_icon_background: '#ffffff'
+  adaptive_icon_foreground: 'assets/images/icon_adaptive_foreground.png'
