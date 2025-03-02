@@ -57,8 +57,8 @@ class _SwipeCardState extends State<SwipeCard>
   // パンジェスチャー終了時の処理
   void _onPanEnd(DragEndDetails details) {
     final screenWidth = MediaQuery.of(context).size.width;
-    // 閾値 = screenWidth * 0.3
-    const thresholdFraction = 0.3;
+    // 閾値 = screenWidth * 0.4
+    const thresholdFraction = 0.4;
     final threshold = screenWidth * thresholdFraction;
 
     if (_dragOffset.dx.abs() > threshold) {
