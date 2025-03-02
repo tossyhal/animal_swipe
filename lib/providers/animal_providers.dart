@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/animal_model.dart';
 import '../services/api_service.dart';
@@ -48,26 +49,49 @@ final animalImagesProvider =
 class AnimalImagesNotifier extends StateNotifier<List<AnimalImage>> {
   final IApiService _apiService;
   final List<String> _selectedTypes;
+  bool _isLoading = false;
 
   /// 画像追加読み込みの閾値
   static const int _loadMoreThreshold = 3;
 
-  AnimalImagesNotifier(this._apiService, this._selectedTypes) : super([]) {
-    loadInitialImages();
-  }
+  AnimalImagesNotifier(this._apiService, this._selectedTypes) : super([]);
 
   /// 初期画像を読み込む処理
   Future<void> loadInitialImages() async {
     if (_selectedTypes.isEmpty) return;
-    final imagesList = await _apiService.fetchImages(_selectedTypes);
-    state = imagesList;
+    if (_isLoading) return;
+
+    try {
+      _isLoading = true;
+      final imagesList = await _apiService.fetchImages(_selectedTypes);
+      if (state.isEmpty) {
+        state = imagesList;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error in loadInitialImages: $e');
+      }
+    } finally {
+      _isLoading = false;
+    }
   }
 
   /// 追加画像を読み込む処理
   Future<void> loadMoreImages() async {
     if (_selectedTypes.isEmpty) return;
-    final moreImages = await _apiService.fetchImages(_selectedTypes);
-    state = [...state, ...moreImages];
+    if (_isLoading) return;
+
+    try {
+      _isLoading = true;
+      final moreImages = await _apiService.fetchImages(_selectedTypes);
+      state = [...state, ...moreImages];
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error in loadMoreImages: $e');
+      }
+    } finally {
+      _isLoading = false;
+    }
   }
 
   /// 一番上の画像を削除し、必要に応じて追加読み込みを実行
