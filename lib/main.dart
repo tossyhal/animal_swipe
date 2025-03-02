@@ -3,7 +3,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/start_screen.dart';
-import 'screens/swipe_screen.dart';
 import 'services/prefs_service.dart';
 
 Future<void> main() async {
@@ -31,10 +30,6 @@ class AnimalSwipeApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ローカルストレージから選択済み動物タイプの有無を確認
-    final prefsService = ref.watch(prefsServiceProvider);
-    final hasSelectedAnimalTypes = prefsService.hasSelectedAnimalTypes();
-
     return MaterialApp(
       title: 'AnimalSwipe',
       theme: ThemeData(
@@ -149,8 +144,8 @@ class AnimalSwipeApp extends ConsumerWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system, // システム設定に合わせてテーマを切り替え
-      // 選択済みの動物タイプがある場合は SwipeScreen、ない場合は StartScreen を表示
-      home: hasSelectedAnimalTypes ? const SwipeScreen() : const StartScreen(),
+      // 常に StartScreen を表示
+      home: const StartScreen(),
     );
   }
 }

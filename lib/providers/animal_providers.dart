@@ -19,6 +19,9 @@ class SelectedAnimalTypesNotifier extends StateNotifier<List<String>> {
 
   /// 動物タイプの選択状態を更新し、ローカルに保存する
   void selectType(String type, bool isSelected) {
+    // 空文字列や空白文字列は無視
+    if (type.trim().isEmpty) return;
+
     if (isSelected && !state.contains(type)) {
       state = [...state, type];
     } else if (!isSelected && state.contains(type)) {
@@ -43,7 +46,7 @@ final animalImagesProvider =
 
 /// 動物画像のリストを管理するStateNotifier
 class AnimalImagesNotifier extends StateNotifier<List<AnimalImage>> {
-  final ApiService _apiService;
+  final IApiService _apiService;
   final List<String> _selectedTypes;
 
   /// 画像追加読み込みの閾値
