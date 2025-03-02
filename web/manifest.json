@@ -1,11 +1,11 @@
 {
-    "name": "animal_swipe",
-    "short_name": "animal_swipe",
+    "name": "Animal Swipe",
+    "short_name": "Animal Swipe",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Animal Swipe.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

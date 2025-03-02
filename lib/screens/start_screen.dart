@@ -48,7 +48,7 @@ class StartScreen extends ConsumerWidget {
                         const SizedBox(height: 20),
                         // アプリタイトル
                         const Text(
-                          'AnimalSwipe',
+                          'Animal Swipe',
                           style: TextStyle(
                             fontSize: 50,
                             fontFamily: 'MPLUSRounded1c',
