@@ -6,8 +6,27 @@ import 'package:animal_swipe/screens/swipe_screen.dart';
 import 'package:animal_swipe/models/animal_model.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/services/api_service.dart';
+import 'package:animal_swipe/services/prefs_service.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
 import 'package:animal_swipe/widgets/swipe_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// テスト用の FakeSharedPreferences の簡易実装
+class FakeSharedPreferences implements SharedPreferences {
+  final Map<String, Object> _data = {};
+
+  @override
+  List<String>? getStringList(String key) => _data[key] as List<String>?;
+
+  @override
+  Future<bool> setStringList(String key, List<String> value) async {
+    _data[key] = value;
+    return true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   final List<AnimalImage> _initialImages;
@@ -105,7 +124,13 @@ void main() {
         AnimalImage(id: '1', url: 'http://example.com/cat.jpg', type: 'cat'),
       ]);
       container = ProviderContainer(
-        overrides: [animalImagesProvider.overrideWith((_) => fakeNotifier)],
+        overrides: [
+          animalImagesProvider.overrideWith((_) => fakeNotifier),
+          // prefsServiceProvider のオーバーライドを追加
+          prefsServiceProvider.overrideWithValue(
+            PrefsService(FakeSharedPreferences()),
+          ),
+        ],
       );
     });
 
@@ -145,7 +170,12 @@ void main() {
       testWidgets('画像が空の場合、ローディングインジケータが表示されること', (tester) async {
         fakeNotifier = FakeAnimalImagesNotifier([]);
         container = ProviderContainer(
-          overrides: [animalImagesProvider.overrideWith((_) => fakeNotifier)],
+          overrides: [
+            animalImagesProvider.overrideWith((_) => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
         );
 
         await tester.pumpWidget(
@@ -249,7 +279,7 @@ void main() {
         );
 
         // SwipeCardを左にスワイプ
-        await tester.drag(find.byType(SwipeCard), const Offset(-300, 0));
+        await tester.drag(find.byType(SwipeCard), const Offset(-400, 0));
         await tester.pumpAndSettle();
 
         // 左スワイプコールバックが呼ばれたことを確認
@@ -278,7 +308,7 @@ void main() {
         );
 
         // SwipeCardを右にスワイプ
-        await tester.drag(find.byType(SwipeCard), const Offset(300, 0));
+        await tester.drag(find.byType(SwipeCard), const Offset(400, 0));
         await tester.pumpAndSettle();
 
         // 右スワイプコールバックが呼ばれたことを確認
@@ -290,7 +320,12 @@ void main() {
       testWidgets('画像が空の場合のアクションボタン無効化テスト', (tester) async {
         fakeNotifier = FakeAnimalImagesNotifier([]);
         container = ProviderContainer(
-          overrides: [animalImagesProvider.overrideWith((_) => fakeNotifier)],
+          overrides: [
+            animalImagesProvider.overrideWith((_) => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
         );
 
         await tester.pumpWidget(

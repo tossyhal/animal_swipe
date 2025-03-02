@@ -80,7 +80,7 @@ void main() {
       );
 
       // 右方向へのドラッグ
-      await tester.drag(find.byType(Card), const Offset(300, 0));
+      await tester.drag(find.byType(Card), const Offset(400, 0));
       await tester.pumpAndSettle();
 
       expect(swipedRight, isTrue, reason: '右スワイプのコールバックが呼ばれること');
@@ -103,7 +103,7 @@ void main() {
       );
 
       // 左方向へのドラッグ
-      await tester.drag(find.byType(Card), const Offset(-300, 0));
+      await tester.drag(find.byType(Card), const Offset(-400, 0));
       await tester.pumpAndSettle();
 
       expect(swipedLeft, isTrue, reason: '左スワイプのコールバックが呼ばれること');

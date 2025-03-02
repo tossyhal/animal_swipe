@@ -85,7 +85,7 @@ class ApiService implements IApiService {
     final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
+      final List<dynamic> data = json.decode(response.body) as List;
       return data.map((item) => AnimalImage.fromJson(item, type)).toList();
     } else {
       throw Exception('Failed to load $type images');
