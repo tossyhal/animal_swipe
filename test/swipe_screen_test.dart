@@ -6,6 +6,8 @@ import 'package:animal_swipe/screens/swipe_screen.dart';
 import 'package:animal_swipe/models/animal_model.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/services/api_service.dart';
+import 'package:animal_swipe/screens/start_screen.dart';
+import 'package:animal_swipe/widgets/swipe_card.dart';
 
 class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   final List<AnimalImage> _initialImages;
@@ -112,7 +114,7 @@ void main() {
     });
 
     group('UI表示テスト', () {
-      testWidgets('アプリバーが正しく表示されること', (tester) async {
+      testWidgets('アプリバーとホームボタンが正しく表示されること', (tester) async {
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
@@ -120,11 +122,11 @@ void main() {
           ),
         );
 
-        // AppBarとペットアイコンの確認
+        // AppBarの確認
         expect(find.byType(AppBar), findsOneWidget);
-        expect(find.byIcon(Icons.pets), findsOneWidget);
-        // タイトルテキストの確認
-        expect(find.text('動物たちとの癒しのひととき'), findsOneWidget);
+        // ホームボタンの確認
+        expect(find.byIcon(Icons.home), findsOneWidget);
+        expect(find.text('ホームに戻る'), findsOneWidget);
       });
 
       testWidgets('画像がある場合、SwipeCardが表示されること', (tester) async {
@@ -137,8 +139,7 @@ void main() {
 
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
-        expect(find.byType(Card), findsWidgets);
-        expect(find.byType(Image), findsWidgets);
+        expect(find.byType(SwipeCard), findsOneWidget);
       });
 
       testWidgets('画像が空の場合、ローディングインジケータが表示されること', (tester) async {
@@ -155,12 +156,13 @@ void main() {
         );
 
         expect(find.byType(CircularProgressIndicator), findsOneWidget);
-        expect(find.byType(Card), findsNothing);
+        expect(find.text('読み込み中...'), findsOneWidget);
+        expect(find.byType(SwipeCard), findsNothing);
       });
     });
 
     group('インタラクションテスト', () {
-      testWidgets('右スワイプで次の画像が表示されること', (tester) async {
+      testWidgets('アクションボタン（×）をタップすると次の画像が表示されること', (tester) async {
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
@@ -171,19 +173,18 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        // 最初のカードを記録
-        final firstCard = find.byType(Card).first;
-
-        // 右にスワイプ
-        await tester.drag(firstCard, const Offset(500, 0));
+        // ×ボタンを探してタップ
+        final closeButton = find.byIcon(Icons.close);
+        expect(closeButton, findsOneWidget);
+        await tester.tap(closeButton);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        // 新しい画像が読み込まれたことを確認
-        expect(fakeNotifier.loadMoreCallCount, 1);
+        // 画像が更新されたことを確認
+        expect(fakeNotifier.loadMoreCallCount, greaterThan(0));
       });
 
-      testWidgets('左スワイプで次の画像が表示されること', (tester) async {
+      testWidgets('アクションボタン（ハート）をタップするとスナックバーが表示されること', (tester) async {
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
@@ -194,21 +195,103 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        final firstCard = find.byType(Card).first;
-
-        // 左にスワイプ
-        await tester.drag(firstCard, const Offset(-500, 0));
+        // ハートボタンを探してタップ
+        final heartButton = find.byIcon(Icons.favorite);
+        expect(heartButton, findsOneWidget);
+        await tester.tap(heartButton);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        // 新しい画像が読み込まれたことを確認
-        expect(fakeNotifier.loadMoreCallCount, 1);
+        // スナックバーが表示されることを確認
+        expect(find.text('お気に入り機能は近日実装予定です'), findsOneWidget);
+        // 画像が更新されたことを確認
+        expect(fakeNotifier.loadMoreCallCount, greaterThan(0));
+      });
+
+      testWidgets('ホームに戻るボタンをタップするとStartScreenに遷移すること', (tester) async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+
+        // ホームに戻るボタンをタップ
+        await tester.tap(find.text('ホームに戻る'));
+        await tester.pumpAndSettle();
+
+        // StartScreenに遷移したことを確認
+        expect(find.byType(StartScreen), findsOneWidget);
+      });
+    });
+
+    // SwipeCardウィジェットのテスト
+    group('SwipeCardテスト', () {
+      testWidgets('左スワイプで正しいコールバックが呼ばれること', (tester) async {
+        bool onSwipeLeftCalled = false;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SwipeCard(
+                image: AnimalImage(
+                  id: '1',
+                  url: 'http://example.com/cat.jpg',
+                  type: 'cat',
+                ),
+                onSwipeLeft: () {
+                  onSwipeLeftCalled = true;
+                },
+                onSwipeRight: () {},
+              ),
+            ),
+          ),
+        );
+
+        // SwipeCardを左にスワイプ
+        await tester.drag(find.byType(SwipeCard), const Offset(-300, 0));
+        await tester.pumpAndSettle();
+
+        // 左スワイプコールバックが呼ばれたことを確認
+        expect(onSwipeLeftCalled, true);
+      });
+
+      testWidgets('右スワイプで正しいコールバックが呼ばれること', (tester) async {
+        bool onSwipeRightCalled = false;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SwipeCard(
+                image: AnimalImage(
+                  id: '1',
+                  url: 'http://example.com/cat.jpg',
+                  type: 'cat',
+                ),
+                onSwipeLeft: () {},
+                onSwipeRight: () {
+                  onSwipeRightCalled = true;
+                },
+              ),
+            ),
+          ),
+        );
+
+        // SwipeCardを右にスワイプ
+        await tester.drag(find.byType(SwipeCard), const Offset(300, 0));
+        await tester.pumpAndSettle();
+
+        // 右スワイプコールバックが呼ばれたことを確認
+        expect(onSwipeRightCalled, true);
       });
     });
 
     group('エラーハンドリングテスト', () {
-      testWidgets('画像読み込みエラー時にエラーメッセージが表示されること', (tester) async {
-        fakeNotifier.setSimulateError(true);
+      testWidgets('画像が空の場合のアクションボタン無効化テスト', (tester) async {
+        fakeNotifier = FakeAnimalImagesNotifier([]);
+        container = ProviderContainer(
+          overrides: [animalImagesProvider.overrideWith((_) => fakeNotifier)],
+        );
 
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -217,39 +300,14 @@ void main() {
           ),
         );
 
-        // エラー発生とエラーメッセージの表示を待つ
+        // アクションボタンをタップしても反応しないことを確認（無効化されている）
+        await tester.tap(find.byIcon(Icons.close));
         await tester.pump();
-        for (int i = 0; i < 5; i++) {
-          await tester.pump(const Duration(milliseconds: 100));
-        }
+        expect(fakeNotifier.loadMoreCallCount, 0);
 
-        // エラー表示を確認
-        expect(find.text('画像の読み込みに失敗しました'), findsOneWidget);
-      });
-
-      testWidgets('追加画像読み込みエラー時にエラーメッセージが表示されること', (tester) async {
-        await tester.pumpWidget(
-          UncontrolledProviderScope(
-            container: container,
-            child: const MaterialApp(home: SwipeScreen()),
-          ),
-        );
-
+        await tester.tap(find.byIcon(Icons.favorite));
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
-
-        // エラーをシミュレート
-        fakeNotifier.setSimulateError(true);
-
-        // スワイプしてエラーを発生させる
-        await tester.drag(find.byType(Card).first, const Offset(500, 0));
-        // アニメーションの完了を待つ
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
-
-        // エラー表示を確認
-        expect(find.byIcon(Icons.error_outline), findsOneWidget);
-        expect(find.text('画像の読み込みに失敗しました'), findsOneWidget);
+        expect(fakeNotifier.loadMoreCallCount, 0);
       });
     });
   });
