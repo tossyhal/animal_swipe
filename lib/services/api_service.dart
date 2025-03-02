@@ -7,15 +7,29 @@ import '../models/animal_model.dart';
 
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
+/// APIサービスのインターフェース
+abstract class IApiService {
+  Future<List<AnimalImage>> fetchImages(List<String> types);
+}
+
 /// APIサービスクラス
 /// 各種動物画像を取得するためのサービス
-class ApiService {
+class ApiService implements IApiService {
   /// APIキーのマッピング
   /// 'cat' と 'dog' はそれぞれ The Cat API と The Dog API 用
-  final Map<String, String> _apiKeys = {
-    'cat': dotenv.env['CAT_API_KEY'] ?? '',
-    'dog': dotenv.env['DOG_API_KEY'] ?? '',
-  };
+  late final Map<String, String> _apiKeys;
+
+  ApiService() {
+    try {
+      _apiKeys = {
+        'cat': dotenv.env['CAT_API_KEY'] ?? '',
+        'dog': dotenv.env['DOG_API_KEY'] ?? '',
+      };
+    } catch (e) {
+      // テスト環境など、.envファイルが存在しない場合は空文字を設定
+      _apiKeys = {'cat': '', 'dog': ''};
+    }
+  }
 
   /// APIのURLマッピング
   /// 'cat' と 'dog' のURLを定義
@@ -27,6 +41,7 @@ class ApiService {
 
   /// 指定された動物タイプの画像を取得し、全画像リストを返す
   /// 各動物タイプごとに画像を取得し、取得した画像をシャッフルして返す
+  @override
   Future<List<AnimalImage>> fetchImages(List<String> types) async {
     List<AnimalImage> allImages = [];
 

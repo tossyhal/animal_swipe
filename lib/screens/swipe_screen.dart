@@ -38,9 +38,15 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
               color: Colors.white.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(30),
             ),
-            child: IconButton(
-              icon: const Icon(Icons.pets, color: Colors.white),
-              tooltip: '動物の種類を変更',
+            child: TextButton.icon(
+              icon: const Icon(Icons.home, color: Colors.white),
+              label: const Text(
+                'ホームに戻る',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'MPLUSRounded1c',
+                ),
+              ),
               onPressed: () {
                 // スタート画面へ戻る
                 Navigator.of(context).pushReplacement(
@@ -72,25 +78,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
             ),
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16.0),
-                  child: Text(
-                    '動物たちとの癒しのひととき',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontFamily: 'MPLUSRounded1c',
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          blurRadius: 5.0,
-                          color: Colors.black26,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const Padding(padding: EdgeInsets.symmetric(vertical: 16.0)),
                 // 画像表示エリア
                 Expanded(
                   child:
@@ -106,7 +94,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  '癒しの動物たちを読み込み中...',
+                                  '読み込み中...',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontFamily: 'MPLUSRounded1c',
@@ -195,16 +183,16 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
     final isEnabled = onPressed != null;
 
     return Material(
-      elevation: isEnabled ? 5 : 0,
+      elevation: isEnabled ? 4 : 0,
       color: Colors.transparent,
       shadowColor: backgroundColor.withValues(alpha: 0.3),
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(25),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(25),
         child: Container(
-          width: 70,
-          height: 70,
+          width: 55,
+          height: 55,
           decoration: BoxDecoration(
             color: isEnabled ? backgroundColor : Colors.grey.shade300,
             shape: BoxShape.circle,
@@ -213,13 +201,13 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                     ? [
                       BoxShadow(
                         color: backgroundColor.withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
                       ),
                     ]
                     : null,
           ),
-          child: Icon(icon, color: Colors.white, size: 32),
+          child: Icon(icon, color: Colors.white, size: 26),
         ),
       ),
     );
