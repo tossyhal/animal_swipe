@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/start_screen.dart';
@@ -10,14 +9,14 @@ Future<void> main() async {
   // Flutterのウィジェットシステムを初期化
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 画面の向きを縦画面に固定する
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-
-  // .env ファイルの読み込み
-  await dotenv.load(fileName: ".env");
+  final futures = await Future.wait([
+    // 画面の向きを縦画面に固定する
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
+    SharedPreferences.getInstance(),
+  ]);
 
   // SharedPreferences の初期化
-  final prefs = await SharedPreferences.getInstance();
+  final prefs = futures[1] as SharedPreferences;
   final prefsService = PrefsService(prefs);
 
   runApp(

@@ -23,6 +23,7 @@ class _SwipeCardState extends State<SwipeCard>
   Offset _dragOffset = Offset.zero;
   Offset _dragStartPosition = Offset.zero;
   bool _isDragging = false;
+  bool _isTap = false;
 
   @override
   void initState() {
@@ -43,12 +44,18 @@ class _SwipeCardState extends State<SwipeCard>
   void _onPanStart(DragStartDetails details) {
     setState(() {
       _isDragging = true;
+      _isTap = true;
       _dragStartPosition = details.globalPosition;
     });
   }
 
   // パンジェスチャー更新時の処理
   void _onPanUpdate(DragUpdateDetails details) {
+    // 移動距離が閾値を超えたら、単純なタップではないとマーク
+    if ((details.globalPosition - _dragStartPosition).distance > 10) {
+      _isTap = false;
+    }
+
     setState(() {
       _dragOffset = details.globalPosition - _dragStartPosition;
     });
@@ -56,6 +63,14 @@ class _SwipeCardState extends State<SwipeCard>
 
   // パンジェスチャー終了時の処理
   void _onPanEnd(DragEndDetails details) {
+    if (_isTap) {
+      setState(() {
+        _isDragging = false;
+        _dragOffset = Offset.zero;
+      });
+      return;
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     // 閾値 = screenWidth * 0.4
     const thresholdFraction = 0.4;

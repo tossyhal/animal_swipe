@@ -37,7 +37,7 @@ void main() {
           ),
         );
 
-        expect(find.text('AnimalSwipe'), findsOneWidget);
+        expect(find.text('Animal Swipe'), findsOneWidget);
       });
 
       testWidgets('全ての動物タイプが表示されること', (tester) async {

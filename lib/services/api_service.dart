@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../models/animal_model.dart';
@@ -15,28 +15,11 @@ abstract class IApiService {
 /// APIサービスクラス
 /// 各種動物画像を取得するためのサービス
 class ApiService implements IApiService {
-  /// APIキーのマッピング
-  /// 'cat' と 'dog' はそれぞれ The Cat API と The Dog API 用
-  late final Map<String, String> _apiKeys;
-
-  ApiService() {
-    try {
-      _apiKeys = {
-        'cat': dotenv.env['CAT_API_KEY'] ?? '',
-        'dog': dotenv.env['DOG_API_KEY'] ?? '',
-      };
-    } catch (e) {
-      // テスト環境など、.envファイルが存在しない場合は空文字を設定
-      _apiKeys = {'cat': '', 'dog': ''};
-    }
-  }
-
   /// APIのURLマッピング
-  /// 'cat' と 'dog' のURLを定義
-  /// その他の動物タイプについては、別途URLの定義が必要
+  /// 'cat' は cataas、'dog' は Dog API を使用
   final Map<String, String> _apiUrls = {
-    'cat': 'https://api.thecatapi.com/v1/images/search?limit=10',
-    'dog': 'https://api.thedogapi.com/v1/images/search?limit=10',
+    'cat': 'https://cataas.com/api/cats', // パラメータは動的に付与
+    'dog': 'https://dog.ceo/api/breeds/image/random/10',
   };
 
   /// 指定された動物タイプの画像を取得し、全画像リストを返す
@@ -71,24 +54,36 @@ class ApiService implements IApiService {
       return [];
     }
 
-    // ヘッダー情報の準備
-    Map<String, String> headers = {};
-
-    // APIキーの設定
-    if (type == 'cat') {
-      headers['x-api-key'] = _apiKeys['cat']!;
-    } else if (type == 'dog') {
-      headers['x-api-key'] = _apiKeys['dog']!;
-    }
-
-    // APIリクエストの実行
-    final response = await http.get(Uri.parse(url), headers: headers);
-
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body) as List;
-      return data.map((item) => AnimalImage.fromJson(item, type)).toList();
+    if (type == 'dog') {
+      // Dog API の場合：JSON構造が { "message": [ ... ], "status": "success" } になっているため、messageから取得
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body) as Map<String, dynamic>;
+        if (jsonData['status'] == 'success') {
+          final List<dynamic> messages = jsonData['message'];
+          return messages
+              .map((item) => AnimalImage.fromJson({'url': item}, type))
+              .toList();
+        } else {
+          throw Exception('Dog API returned error');
+        }
+      } else {
+        throw Exception('Failed to load dog images');
+      }
+    } else if (type == 'cat') {
+      // 猫の場合：cataas APIはリスト形式で返すが、ランダムな画像を取得するためにskipパラメータをランダムに設定
+      // ここでは、適当に 0〜999 の間の値をskipに設定
+      final randomSkip = Random().nextInt(1000);
+      final catUrl = '$url?limit=10&skip=$randomSkip';
+      final response = await http.get(Uri.parse(catUrl));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body) as List<dynamic>;
+        return data.map((item) => AnimalImage.fromJson(item, type)).toList();
+      } else {
+        throw Exception('Failed to load cat images');
+      }
     } else {
-      throw Exception('Failed to load $type images');
+      return [];
     }
   }
 }
