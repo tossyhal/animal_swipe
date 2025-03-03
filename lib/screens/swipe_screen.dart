@@ -28,35 +28,50 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: TextButton.icon(
-              icon: const Icon(Icons.home, color: Colors.white),
-              label: const Text(
-                'ホームに戻る',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white,
-                  fontFamily: 'MPLUSRounded1c',
+      appBar: PreferredSize(
+        // AppBarの高さを大きくして位置を下げる
+        preferredSize: const Size.fromHeight(80),
+        child: Container(
+          padding: const EdgeInsets.only(top: 20), // 上部に余白を追加して下げる
+          child: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            actions: [
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TextButton.icon(
+                  icon: const Icon(Icons.home, color: Colors.black87),
+                  label: const Text(
+                    'ホームに戻る',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'MPLUSRounded1c',
+                    ),
+                  ),
+                  onPressed: () {
+                    // スタート画面へ戻る
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const StartScreen()),
+                    );
+                  },
                 ),
               ),
-              onPressed: () {
-                // スタート画面へ戻る
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const StartScreen()),
-                );
-              },
-            ),
+            ],
           ),
-        ],
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(
