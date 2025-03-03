@@ -21,13 +21,10 @@ class ApiService implements IApiService {
 
   ApiService() {
     try {
-      _apiKeys = {
-        'cat': dotenv.env['CAT_API_KEY'] ?? '',
-        'dog': dotenv.env['DOG_API_KEY'] ?? '',
-      };
+      _apiKeys = {'dog': dotenv.env['DOG_API_KEY'] ?? ''};
     } catch (e) {
       // テスト環境など、.envファイルが存在しない場合は空文字を設定
-      _apiKeys = {'cat': '', 'dog': ''};
+      _apiKeys = {'dog': ''};
     }
   }
 
@@ -35,7 +32,7 @@ class ApiService implements IApiService {
   /// 'cat' と 'dog' のURLを定義
   /// その他の動物タイプについては、別途URLの定義が必要
   final Map<String, String> _apiUrls = {
-    'cat': 'https://api.thecatapi.com/v1/images/search?limit=10',
+    'cat': 'https://cataas.com/api/cats?limit=10&skip=0',
     'dog': 'https://api.thedogapi.com/v1/images/search?limit=10',
   };
 
@@ -75,9 +72,7 @@ class ApiService implements IApiService {
     Map<String, String> headers = {};
 
     // APIキーの設定
-    if (type == 'cat') {
-      headers['x-api-key'] = _apiKeys['cat']!;
-    } else if (type == 'dog') {
+    if (type == 'dog') {
       headers['x-api-key'] = _apiKeys['dog']!;
     }
 

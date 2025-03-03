@@ -32,13 +32,9 @@ class AnimalImage {
       // The Cat API のパースロジック
       return AnimalImage(
         id: json['id'] ?? '',
-        url: json['url'] ?? '',
+        url: "https://cataas.com/cat/${json['id']}",
         type: 'cat',
-        description:
-            json['breeds']?.isNotEmpty == true
-                ? json['breeds'][0]['name']
-                : null,
-        source: 'The Cat API',
+        source: 'Cat as a service',
       );
     } else if (type == 'dog') {
       // The Dog API のパースロジック
