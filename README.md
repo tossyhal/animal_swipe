@@ -1,4 +1,6 @@
 # Animal Swipe
+![workflow](https://github.com/tossyhal/animal_swipe/actions/workflows/firebase-hosting-merge.yml/badge.svg)
+
 <img src="https://github.com/user-attachments/assets/92290127-2a09-4680-8911-26d71861ee33" width="35%">          　
 <img src="https://github.com/user-attachments/assets/696eb54e-4db4-4a21-bd86-979c56e92877" width="35%">
 
