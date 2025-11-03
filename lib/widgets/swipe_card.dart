@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_constants.dart';
 import '../models/animal_model.dart';
 
 class SwipeCard extends StatefulWidget {
@@ -30,7 +31,9 @@ class _SwipeCardState extends State<SwipeCard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(
+        milliseconds: AppConstants.animationDurationShort,
+      ),
     );
   }
 
