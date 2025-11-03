@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/animal_model.dart';
 import '../services/api_service.dart';
 import '../services/prefs_service.dart';
+import '../utils/logger.dart';
 
 /// 選択された動物タイプを管理するプロバイダー
 final selectedAnimalTypesProvider =
@@ -68,9 +68,7 @@ class AnimalImagesNotifier extends StateNotifier<List<AnimalImage>> {
         state = imagesList;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in loadInitialImages: $e');
-      }
+      AppLogger.error('Error in loadInitialImages', e);
     } finally {
       _isLoading = false;
     }
@@ -86,9 +84,7 @@ class AnimalImagesNotifier extends StateNotifier<List<AnimalImage>> {
       final moreImages = await _apiService.fetchImages(_selectedTypes);
       state = [...state, ...moreImages];
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in loadMoreImages: $e');
-      }
+      AppLogger.error('Error in loadMoreImages', e);
     } finally {
       _isLoading = false;
     }

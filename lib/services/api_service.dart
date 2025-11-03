@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../models/animal_model.dart';
+import '../utils/logger.dart';
 
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
@@ -34,9 +34,7 @@ class ApiService implements IApiService {
         final images = await _fetchImagesForType(type);
         allImages.addAll(images);
       } catch (e) {
-        if (kDebugMode) {
-          print('Error fetching $type images: $e');
-        }
+        AppLogger.error('Error fetching $type images', e);
       }
     }
 
