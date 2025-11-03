@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/app_constants.dart';
+import '../constants/app_strings.dart';
 import '../providers/animal_providers.dart';
+import '../theme/theme_extensions.dart';
+import '../widgets/common/gradient_background.dart';
 import 'swipe_screen.dart';
 
 class StartScreen extends ConsumerWidget {
@@ -13,26 +17,23 @@ class StartScreen extends ConsumerWidget {
 
     // 利用可能な動物タイプ一覧
     final List<Map<String, dynamic>> availableTypes = [
-      {'id': 'cat', 'name': 'ねこ', 'icon': Icons.pets, 'emoji': '🐱'},
-      {'id': 'dog', 'name': 'いぬ', 'icon': Icons.pets, 'emoji': '🐶'},
+      {
+        'id': 'cat',
+        'name': AppStrings.animalCat,
+        'icon': Icons.pets,
+        'emoji': AppStrings.animalCatEmoji,
+      },
+      {
+        'id': 'dog',
+        'name': AppStrings.animalDog,
+        'icon': Icons.pets,
+        'emoji': AppStrings.animalDogEmoji,
+      },
     ];
 
     return Scaffold(
-      // Scaffoldに直接背景色を設定して画面全体をカバー
       backgroundColor: Colors.transparent,
-      body: Container(
-        // 画面全体をカバーするコンテナ
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-              Theme.of(context).colorScheme.primaryContainer,
-            ],
-          ),
-        ),
-        // SafeAreaをラップ
+      body: GradientBackground(
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -45,13 +46,13 @@ class StartScreen extends ConsumerWidget {
                   child: Center(
                     child: Column(
                       children: [
-                        const SizedBox(height: 20),
+                        const SizedBox(height: AppConstants.paddingLarge),
                         // アプリタイトル
                         const Text(
-                          'Animal Swipe',
+                          AppStrings.appName,
                           style: TextStyle(
-                            fontSize: 50,
-                            fontFamily: 'MPLUSRounded1c',
+                            fontSize: AppConstants.fontSizeTitle,
+                            fontFamily: AppStrings.fontFamily,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                             shadows: [
@@ -64,20 +65,31 @@ class StartScreen extends ConsumerWidget {
                           ),
                         ),
                         SizedBox(
-                          // 使用可能な高さの20%分のスペースを確保
-                          height: availableHeight * 0.15,
+                          height:
+                              availableHeight *
+                                  AppConstants.layoutSpacingPercentage,
                         ),
                         // 動物選択部分
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppConstants.paddingLarge,
+                          ),
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(
+                              AppConstants.paddingMedium,
+                            ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(20),
+                              color: Colors.white.withValues(
+                                alpha: AppConstants.opacityHigh,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                AppConstants.borderRadiusLarge,
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
+                                  color: Colors.black.withValues(
+                                    alpha: AppConstants.opacityMinimal,
+                                  ),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 ),
@@ -88,29 +100,30 @@ class StartScreen extends ConsumerWidget {
                               children: [
                                 Center(
                                   child: Text(
-                                    '表示する動物を選択してください',
+                                    AppStrings.selectAnimalPrompt,
                                     style: TextStyle(
-                                      fontSize: 18,
-                                      fontFamily: 'MPLUSRounded1c',
+                                      fontSize: AppConstants.fontSizeLarge,
+                                      fontFamily: AppStrings.fontFamily,
                                       fontWeight: FontWeight.bold,
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onPrimaryContainer,
+                                      color: context.colors.onPrimaryContainer,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: AppConstants.paddingLarge),
                                 // グリッドで動物タイプを表示
                                 GridView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   gridDelegate:
                                       const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        childAspectRatio: 1.2,
-                                        crossAxisSpacing: 16,
-                                        mainAxisSpacing: 16,
+                                        crossAxisCount:
+                                            AppConstants.gridCrossAxisCount,
+                                        childAspectRatio:
+                                            AppConstants.gridChildAspectRatio,
+                                        crossAxisSpacing:
+                                            AppConstants.gridCrossAxisSpacing,
+                                        mainAxisSpacing:
+                                            AppConstants.gridMainAxisSpacing,
                                       ),
                                   itemCount: availableTypes.length,
                                   itemBuilder: (context, index) {
@@ -133,30 +146,31 @@ class StartScreen extends ConsumerWidget {
                                       },
                                       child: AnimatedContainer(
                                         duration: const Duration(
-                                          milliseconds: 300,
+                                          milliseconds:
+                                              AppConstants.animationDurationShort,
                                         ),
                                         decoration: BoxDecoration(
                                           color:
                                               isSelected
-                                                  ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.primaryContainer
+                                                  ? context.colors.primaryContainer
                                                   : Colors.white,
                                           borderRadius: BorderRadius.circular(
-                                            16,
+                                            AppConstants.borderRadiusMedium,
                                           ),
                                           boxShadow: [
                                             BoxShadow(
                                               color:
                                                   isSelected
-                                                      ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
+                                                      ? context.colors.primary
                                                           .withValues(
-                                                            alpha: 0.4,
+                                                            alpha:
+                                                                AppConstants
+                                                                    .opacityLow,
                                                           )
                                                       : Colors.grey.withValues(
-                                                        alpha: 0.2,
+                                                        alpha:
+                                                            AppConstants
+                                                                .opacityExtraLow,
                                                       ),
                                               blurRadius: 8,
                                               offset: const Offset(0, 3),
@@ -173,21 +187,24 @@ class StartScreen extends ConsumerWidget {
                                                 Text(
                                                   type['emoji'] as String,
                                                   style: const TextStyle(
-                                                    fontSize: 48,
+                                                    fontSize:
+                                                        AppConstants.fontSizeEmoji,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 8),
+                                                const SizedBox(
+                                                  height: AppConstants.paddingSmall,
+                                                ),
                                                 Text(
                                                   type['name'] as String,
                                                   style: TextStyle(
-                                                    fontSize: 20,
+                                                    fontSize:
+                                                        AppConstants.fontSizeXLarge,
                                                     fontFamily:
-                                                        'MPLUSRounded1c',
+                                                        AppStrings.fontFamily,
                                                     fontWeight: FontWeight.bold,
                                                     color:
                                                         isSelected
-                                                            ? Theme.of(context)
-                                                                .colorScheme
+                                                            ? context.colors
                                                                 .onPrimaryContainer
                                                             : Colors.black87,
                                                   ),
@@ -196,23 +213,21 @@ class StartScreen extends ConsumerWidget {
                                             ),
                                             if (isSelected)
                                               Positioned(
-                                                top: 8,
-                                                right: 8,
+                                                top: AppConstants.paddingSmall,
+                                                right: AppConstants.paddingSmall,
                                                 child: Container(
                                                   padding: const EdgeInsets.all(
-                                                    4,
+                                                    AppConstants.paddingXSmall,
                                                   ),
                                                   decoration: BoxDecoration(
-                                                    color:
-                                                        Theme.of(
-                                                          context,
-                                                        ).colorScheme.primary,
+                                                    color: context.colors.primary,
                                                     shape: BoxShape.circle,
                                                   ),
                                                   child: const Icon(
                                                     Icons.check,
                                                     color: Colors.white,
-                                                    size: 16,
+                                                    size:
+                                                        AppConstants.iconSizeSmall,
                                                   ),
                                                 ),
                                               ),
@@ -222,7 +237,7 @@ class StartScreen extends ConsumerWidget {
                                     );
                                   },
                                 ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: AppConstants.paddingLarge),
                                 // 「始める」ボタン（選択がない場合は無効）
                                 SizedBox(
                                   width: double.infinity,
@@ -251,23 +266,24 @@ class StartScreen extends ConsumerWidget {
                                             },
                                     style: ElevatedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(
-                                        vertical: 16,
+                                        vertical: AppConstants.paddingMedium,
                                       ),
-                                      backgroundColor:
-                                          Theme.of(context).colorScheme.primary,
+                                      backgroundColor: context.colors.primary,
                                       foregroundColor: Colors.white,
                                       disabledBackgroundColor:
                                           Colors.grey.shade300,
-                                      elevation: 3,
+                                      elevation: AppConstants.elevationLow,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(
+                                          AppConstants.borderRadiusMedium,
+                                        ),
                                       ),
                                     ),
                                     child: Text(
-                                      'はじめる',
+                                      AppStrings.startButton,
                                       style: TextStyle(
-                                        fontSize: 18,
-                                        fontFamily: 'MPLUSRounded1c',
+                                        fontSize: AppConstants.fontSizeLarge,
+                                        fontFamily: AppStrings.fontFamily,
                                         fontWeight: FontWeight.bold,
                                         color:
                                             selectedTypes.isEmpty
@@ -282,8 +298,9 @@ class StartScreen extends ConsumerWidget {
                           ),
                         ),
                         SizedBox(
-                          // 使用可能な高さの20%分のスペースを確保
-                          height: availableHeight * 0.15,
+                          height:
+                              availableHeight *
+                                  AppConstants.layoutSpacingPercentage,
                         ),
                       ],
                     ),

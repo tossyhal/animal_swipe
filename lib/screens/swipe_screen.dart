@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/app_constants.dart';
+import '../constants/app_strings.dart';
 import '../providers/animal_providers.dart';
+import '../theme/theme_extensions.dart';
+import '../widgets/common/action_button.dart';
+import '../widgets/common/gradient_background.dart';
 import '../widgets/swipe_card.dart';
 import 'start_screen.dart';
 
@@ -29,22 +34,31 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        // AppBarの高さを大きくして位置を下げる
-        preferredSize: const Size.fromHeight(80),
+        preferredSize: const Size.fromHeight(AppConstants.appBarHeight),
         child: Container(
-          padding: const EdgeInsets.only(top: 20), // 上部に余白を追加して下げる
+          padding: const EdgeInsets.only(
+            top: AppConstants.appBarTopPadding,
+          ),
           child: AppBar(
             elevation: 0,
             backgroundColor: Colors.transparent,
             actions: [
               Container(
-                margin: const EdgeInsets.only(right: 16),
+                margin: const EdgeInsets.only(
+                  right: AppConstants.paddingMedium,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(30),
+                  color: Colors.white.withValues(
+                    alpha: AppConstants.opacityMediumLow,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    AppConstants.borderRadiusExtraLarge,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: Colors.black.withValues(
+                        alpha: AppConstants.opacityExtraLow,
+                      ),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -53,12 +67,12 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                 child: TextButton.icon(
                   icon: const Icon(Icons.home, color: Colors.black87),
                   label: const Text(
-                    'ホームに戻る',
+                    AppStrings.homeButton,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: AppConstants.fontSizeSmall,
                       color: Colors.black87,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'MPLUSRounded1c',
+                      fontFamily: AppStrings.fontFamily,
                     ),
                   ),
                   onPressed: () {
@@ -73,28 +87,22 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
           ),
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-              Theme.of(context).colorScheme.primaryContainer,
-            ],
-          ),
-        ),
+      body: GradientBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.only(
-              top: 16.0,
-              left: 16.0,
-              right: 16.0,
-              bottom: 24.0,
+              top: AppConstants.paddingMedium,
+              left: AppConstants.paddingMedium,
+              right: AppConstants.paddingMedium,
+              bottom: AppConstants.paddingLarge,
             ),
             child: Column(
               children: [
-                const Padding(padding: EdgeInsets.symmetric(vertical: 16.0)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppConstants.paddingMedium,
+                  ),
+                ),
                 // 画像表示エリア
                 Expanded(
                   child:
@@ -108,13 +116,15 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                                     Colors.white,
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '読み込み中...',
+                                const SizedBox(
+                                  height: AppConstants.paddingMedium,
+                                ),
+                                const Text(
+                                  AppStrings.loading,
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontFamily: 'MPLUSRounded1c',
-                                    fontSize: 16,
+                                    fontFamily: AppStrings.fontFamily,
+                                    fontSize: AppConstants.fontSizeMedium,
                                   ),
                                 ),
                               ],
@@ -136,12 +146,12 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                             },
                           ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppConstants.paddingLarge),
                 // 下部ボタン群
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildActionButton(
+                    ActionButton(
                       onPressed:
                           images.isEmpty
                               ? null
@@ -152,10 +162,10 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                                     .removeTopImage();
                               },
                       icon: Icons.close,
-                      backgroundColor: Theme.of(context).colorScheme.error,
+                      backgroundColor: context.colors.error,
                     ),
-                    const SizedBox(width: 24),
-                    _buildActionButton(
+                    const SizedBox(width: AppConstants.paddingLarge),
+                    ActionButton(
                       onPressed:
                           images.isEmpty
                               ? null
@@ -163,13 +173,16 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                                 // お気に入り機能は後日実装予定
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text('お気に入り機能は近日実装予定です'),
-                                    backgroundColor:
-                                        Theme.of(context).colorScheme.primary,
+                                    content: const Text(
+                                      AppStrings.favoriteFeatureComingSoon,
+                                    ),
+                                    backgroundColor: context.colors.primary,
                                     duration: const Duration(seconds: 2),
                                     behavior: SnackBarBehavior.floating,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(
+                                        AppConstants.borderRadiusSmall,
+                                      ),
                                     ),
                                   ),
                                 );
@@ -186,44 +199,6 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required VoidCallback? onPressed,
-    required IconData icon,
-    required Color backgroundColor,
-  }) {
-    final isEnabled = onPressed != null;
-
-    return Material(
-      elevation: isEnabled ? 4 : 0,
-      color: Colors.transparent,
-      shadowColor: backgroundColor.withValues(alpha: 0.3),
-      borderRadius: BorderRadius.circular(25),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(25),
-        child: Container(
-          width: 55,
-          height: 55,
-          decoration: BoxDecoration(
-            color: isEnabled ? backgroundColor : Colors.grey.shade300,
-            shape: BoxShape.circle,
-            boxShadow:
-                isEnabled
-                    ? [
-                      BoxShadow(
-                        color: backgroundColor.withValues(alpha: 0.4),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                    : null,
-          ),
-          child: Icon(icon, color: Colors.white, size: 26),
         ),
       ),
     );
