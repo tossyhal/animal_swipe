@@ -21,6 +21,8 @@ class SwipeCard extends StatefulWidget {
 class _SwipeCardState extends State<SwipeCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  Animation<Offset>? _offsetAnimation;
+  VoidCallback? _animationComplete;
   Offset _dragOffset = Offset.zero;
   Offset _dragStartPosition = Offset.zero;
   bool _isDragging = false;
@@ -29,12 +31,31 @@ class _SwipeCardState extends State<SwipeCard>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(
-        milliseconds: AppConstants.animationDurationShort,
-      ),
-    );
+    _controller =
+        AnimationController(
+            vsync: this,
+            duration: const Duration(
+              milliseconds: AppConstants.animationDurationShort,
+            ),
+          )
+          ..addListener(() {
+            final animation = _offsetAnimation;
+            if (animation != null && mounted) {
+              setState(() => _dragOffset = animation.value);
+            }
+          })
+          ..addStatusListener((status) {
+            if (status != AnimationStatus.completed) return;
+            final callback = _animationComplete;
+            _animationComplete = null;
+            callback?.call();
+            if (mounted) {
+              setState(() {
+                _dragOffset = Offset.zero;
+                _isDragging = false;
+              });
+            }
+          });
   }
 
   @override
@@ -59,9 +80,8 @@ class _SwipeCardState extends State<SwipeCard>
       _isTap = false;
     }
 
-    setState(() {
-      _dragOffset = details.globalPosition - _dragStartPosition;
-    });
+    final rawOffset = details.globalPosition - _dragStartPosition;
+    setState(() => _dragOffset = Offset(rawOffset.dx, rawOffset.dy * 0.18));
   }
 
   // パンジェスチャー終了時の処理
@@ -75,13 +95,20 @@ class _SwipeCardState extends State<SwipeCard>
     }
 
     final screenWidth = MediaQuery.of(context).size.width;
-    // 閾値 = screenWidth * 0.4
-    const thresholdFraction = 0.4;
+    // 距離だけでなくフリック速度も考慮し、片手でも軽く操作できるようにする
+    const thresholdFraction = 0.22;
     final threshold = screenWidth * thresholdFraction;
+    final horizontalVelocity = details.velocity.pixelsPerSecond.dx;
+    final isFastHorizontalFlick =
+        horizontalVelocity.abs() > 700 &&
+        horizontalVelocity.abs() >
+            details.velocity.pixelsPerSecond.dy.abs() * 1.2;
 
-    if (_dragOffset.dx.abs() > threshold) {
+    if (_dragOffset.dx.abs() > threshold || isFastHorizontalFlick) {
       // 横方向のスワイプが閾値を超えた場合
-      if (_dragOffset.dx > 0) {
+      final swipedRight =
+          _dragOffset.dx == 0 ? horizontalVelocity > 0 : _dragOffset.dx > 0;
+      if (swipedRight) {
         // 右スワイプの場合
         _animateCardOut(screenWidth * 1.5, 0, widget.onSwipeRight);
       } else {
@@ -103,30 +130,12 @@ class _SwipeCardState extends State<SwipeCard>
     final startOffset = _dragOffset;
     final endOffset = Offset(targetX, targetY);
 
-    _controller.reset();
-
-    Animation<Offset> animation = Tween<Offset>(
+    _offsetAnimation = Tween<Offset>(
       begin: startOffset,
       end: endOffset,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    animation.addListener(() {
-      setState(() {
-        _dragOffset = animation.value;
-      });
-    });
-
-    animation.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        onComplete();
-        setState(() {
-          _dragOffset = Offset.zero;
-          _isDragging = false;
-        });
-      }
-    });
-
-    _controller.forward();
+    _animationComplete = onComplete;
+    _controller.forward(from: 0);
   }
 
   // スワイプ失敗時にカードを中央に戻すアニメーション
@@ -134,36 +143,20 @@ class _SwipeCardState extends State<SwipeCard>
     final startOffset = _dragOffset;
     final endOffset = Offset.zero;
 
-    _controller.reset();
-
-    Animation<Offset> animation = Tween<Offset>(
+    _offsetAnimation = Tween<Offset>(
       begin: startOffset,
       end: endOffset,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    animation.addListener(() {
-      setState(() {
-        _dragOffset = animation.value;
-      });
-    });
-
-    animation.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        setState(() {
-          _isDragging = false;
-        });
-      }
-    });
-
-    _controller.forward();
+    _animationComplete = null;
+    _controller.forward(from: 0);
   }
 
   @override
   Widget build(BuildContext context) {
     // 回転角度 = _dragOffset.dx / 800
-    final rotationAngle = _dragOffset.dx / 800;
+    final rotationAngle = _dragOffset.dx / 900;
     final isLiked = _dragOffset.dx > 0;
-    final scale = _isDragging ? 0.95 : 1.0;
+    final scale = _isDragging ? 0.975 : 1.0;
 
     return GestureDetector(
       onPanStart: _onPanStart,
@@ -178,9 +171,9 @@ class _SwipeCardState extends State<SwipeCard>
             child: Stack(
               children: [
                 Card(
-                  elevation: 8,
+                  elevation: 5,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20), // 丸みを増加
+                    borderRadius: BorderRadius.circular(28),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: SizedBox(
@@ -301,8 +294,8 @@ class _SwipeCardState extends State<SwipeCard>
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.surface,
                             borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(20),
-                              bottomRight: Radius.circular(20),
+                              bottomLeft: Radius.circular(28),
+                              bottomRight: Radius.circular(28),
                             ),
                           ),
                           padding: const EdgeInsets.all(16.0),
