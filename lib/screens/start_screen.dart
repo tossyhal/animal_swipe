@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../constants/app_constants.dart';
+
 import '../constants/app_strings.dart';
 import '../providers/animal_providers.dart';
 import '../theme/theme_extensions.dart';
@@ -10,26 +10,24 @@ import 'swipe_screen.dart';
 class StartScreen extends ConsumerWidget {
   const StartScreen({super.key});
 
+  static const _animalTypes = [
+    (
+      id: 'cat',
+      name: AppStrings.animalCat,
+      description: AppStrings.animalCatDescription,
+      emoji: AppStrings.animalCatEmoji,
+    ),
+    (
+      id: 'dog',
+      name: AppStrings.animalDog,
+      description: AppStrings.animalDogDescription,
+      emoji: AppStrings.animalDogEmoji,
+    ),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 選択中の動物タイプを監視
     final selectedTypes = ref.watch(selectedAnimalTypesProvider);
-
-    // 利用可能な動物タイプ一覧
-    final List<Map<String, dynamic>> availableTypes = [
-      {
-        'id': 'cat',
-        'name': AppStrings.animalCat,
-        'icon': Icons.pets,
-        'emoji': AppStrings.animalCatEmoji,
-      },
-      {
-        'id': 'dog',
-        'name': AppStrings.animalDog,
-        'icon': Icons.pets,
-        'emoji': AppStrings.animalDogEmoji,
-      },
-    ];
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -37,277 +35,315 @@ class StartScreen extends ConsumerWidget {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // 使用可能な高さを取得
-              final availableHeight = constraints.maxHeight;
+              final horizontalPadding =
+                  constraints.maxWidth < 420 ? 20.0 : 32.0;
 
               return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  28,
+                  horizontalPadding,
+                  24,
+                ),
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: availableHeight),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: AppConstants.paddingLarge),
-                        // アプリタイトル
-                        const Text(
-                          AppStrings.appName,
-                          style: TextStyle(
-                            fontSize: AppConstants.fontSizeTitle,
-                            fontFamily: AppStrings.fontFamily,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                blurRadius: 5.0,
-                                color: Colors.black26,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(
-                          height:
-                              availableHeight *
-                                  AppConstants.layoutSpacingPercentage,
-                        ),
-                        // 動物選択部分
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppConstants.paddingLarge,
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(
-                              AppConstants.paddingMedium,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(
-                                alpha: AppConstants.opacityHigh,
-                              ),
-                              borderRadius: BorderRadius.circular(
-                                AppConstants.borderRadiusLarge,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(
-                                    alpha: AppConstants.opacityMinimal,
-                                  ),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Center(
-                                  child: Text(
-                                    AppStrings.selectAnimalPrompt,
-                                    style: TextStyle(
-                                      fontSize: AppConstants.fontSizeLarge,
-                                      fontFamily: AppStrings.fontFamily,
-                                      fontWeight: FontWeight.bold,
-                                      color: context.colors.onPrimaryContainer,
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 52,
+                    maxWidth: 560,
+                  ),
+                  child: Column(
+                    children: [
+                      const _BrandHeader(),
+                      const SizedBox(height: 36),
+                      _SelectionPanel(
+                        selectedTypes: selectedTypes,
+                        onToggle: (type, isSelected) {
+                          ref
+                              .read(selectedAnimalTypesProvider.notifier)
+                              .selectType(type, isSelected);
+                        },
+                        onStart:
+                            selectedTypes.isEmpty
+                                ? null
+                                : () {
+                                  ref
+                                      .read(
+                                        selectedAnimalTypesProvider.notifier,
+                                      )
+                                      .saveSelectedTypes();
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => const SwipeScreen(),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: AppConstants.paddingLarge),
-                                // グリッドで動物タイプを表示
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount:
-                                            AppConstants.gridCrossAxisCount,
-                                        childAspectRatio:
-                                            AppConstants.gridChildAspectRatio,
-                                        crossAxisSpacing:
-                                            AppConstants.gridCrossAxisSpacing,
-                                        mainAxisSpacing:
-                                            AppConstants.gridMainAxisSpacing,
-                                      ),
-                                  itemCount: availableTypes.length,
-                                  itemBuilder: (context, index) {
-                                    final type = availableTypes[index];
-                                    final bool isSelected = selectedTypes
-                                        .contains(type['id']);
-
-                                    return InkWell(
-                                      onTap: () {
-                                        // 選択状態の切り替え
-                                        ref
-                                            .read(
-                                              selectedAnimalTypesProvider
-                                                  .notifier,
-                                            )
-                                            .selectType(
-                                              type['id'] as String,
-                                              !isSelected,
-                                            );
-                                      },
-                                      child: AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds:
-                                              AppConstants.animationDurationShort,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color:
-                                              isSelected
-                                                  ? context.colors.primaryContainer
-                                                  : Colors.white,
-                                          borderRadius: BorderRadius.circular(
-                                            AppConstants.borderRadiusMedium,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color:
-                                                  isSelected
-                                                      ? context.colors.primary
-                                                          .withValues(
-                                                            alpha:
-                                                                AppConstants
-                                                                    .opacityLow,
-                                                          )
-                                                      : Colors.grey.withValues(
-                                                        alpha:
-                                                            AppConstants
-                                                                .opacityExtraLow,
-                                                      ),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Text(
-                                                  type['emoji'] as String,
-                                                  style: const TextStyle(
-                                                    fontSize:
-                                                        AppConstants.fontSizeEmoji,
-                                                  ),
-                                                ),
-                                                const SizedBox(
-                                                  height: AppConstants.paddingSmall,
-                                                ),
-                                                Text(
-                                                  type['name'] as String,
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        AppConstants.fontSizeXLarge,
-                                                    fontFamily:
-                                                        AppStrings.fontFamily,
-                                                    fontWeight: FontWeight.bold,
-                                                    color:
-                                                        isSelected
-                                                            ? context.colors
-                                                                .onPrimaryContainer
-                                                            : Colors.black87,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            if (isSelected)
-                                              Positioned(
-                                                top: AppConstants.paddingSmall,
-                                                right: AppConstants.paddingSmall,
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(
-                                                    AppConstants.paddingXSmall,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: context.colors.primary,
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: const Icon(
-                                                    Icons.check,
-                                                    color: Colors.white,
-                                                    size:
-                                                        AppConstants.iconSizeSmall,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: AppConstants.paddingLarge),
-                                // 「始める」ボタン（選択がない場合は無効）
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed:
-                                        selectedTypes.isEmpty
-                                            ? null
-                                            : () {
-                                              // 選択状態の保存
-                                              ref
-                                                  .read(
-                                                    selectedAnimalTypesProvider
-                                                        .notifier,
-                                                  )
-                                                  .saveSelectedTypes();
-                                              // 画面遷移：SwipeScreenへ
-                                              Navigator.of(
-                                                context,
-                                              ).pushReplacement(
-                                                MaterialPageRoute(
-                                                  builder:
-                                                      (_) =>
-                                                          const SwipeScreen(),
-                                                ),
-                                              );
-                                            },
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: AppConstants.paddingMedium,
-                                      ),
-                                      backgroundColor: context.colors.primary,
-                                      foregroundColor: Colors.white,
-                                      disabledBackgroundColor:
-                                          Colors.grey.shade300,
-                                      elevation: AppConstants.elevationLow,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          AppConstants.borderRadiusMedium,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      AppStrings.startButton,
-                                      style: TextStyle(
-                                        fontSize: AppConstants.fontSizeLarge,
-                                        fontFamily: AppStrings.fontFamily,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            selectedTypes.isEmpty
-                                                ? Colors.grey.shade500
-                                                : Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                  );
+                                },
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 28),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.swipe_rounded,
+                              size: 18,
+                              color: Colors.white70,
                             ),
-                          ),
+                            SizedBox(width: 8),
+                            Text(
+                              AppStrings.swipeHint,
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontFamily: AppStrings.fontFamily,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(
-                          height:
-                              availableHeight *
-                                  AppConstants.layoutSpacingPercentage,
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white24,
+            shape: BoxShape.circle,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(14),
+            child: Icon(Icons.pets_rounded, color: Colors.white, size: 30),
+          ),
+        ),
+        SizedBox(height: 14),
+        Text(
+          AppStrings.appName,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            height: 1,
+            fontSize: 42,
+            fontFamily: AppStrings.fontFamily,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -1.5,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 12),
+        Text(
+          AppStrings.tagline,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: AppStrings.fontFamily,
+            fontSize: 15,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SelectionPanel extends StatelessWidget {
+  final List<String> selectedTypes;
+  final void Function(String type, bool isSelected) onToggle;
+  final VoidCallback? onStart;
+
+  const _SelectionPanel({
+    required this.selectedTypes,
+    required this.onToggle,
+    required this.onStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.colors.surface.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Text(
+              AppStrings.selectAnimalPrompt,
+              style: TextStyle(
+                fontFamily: AppStrings.fontFamily,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppStrings.selectAnimalHint,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 20),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 1.4,
+                crossAxisSpacing: 12,
+              ),
+              itemCount: StartScreen._animalTypes.length,
+              itemBuilder: (context, index) {
+                final type = StartScreen._animalTypes[index];
+                final isSelected = selectedTypes.contains(type.id);
+                return _AnimalChoice(
+                  name: type.name,
+                  description: type.description,
+                  emoji: type.emoji,
+                  isSelected: isSelected,
+                  onTap: () => onToggle(type.id, !isSelected),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: onStart,
+                style: ElevatedButton.styleFrom(
+                  disabledBackgroundColor:
+                      context.colors.surfaceContainerHighest,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      AppStrings.startButton,
+                      style: TextStyle(
+                        fontFamily: AppStrings.fontFamily,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(Icons.arrow_forward_rounded, size: 20),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimalChoice extends StatelessWidget {
+  final String name;
+  final String description;
+  final String emoji;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _AnimalChoice({
+    required this.name,
+    required this.description,
+    required this.emoji,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '$nameを選択',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color:
+                  isSelected
+                      ? context.colors.primaryContainer
+                      : context.colors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color:
+                    isSelected
+                        ? context.colors.primary
+                        : context.colors.outlineVariant,
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(emoji, style: const TextStyle(fontSize: 44)),
+                      const SizedBox(height: 8),
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontFamily: AppStrings.fontFamily,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppStrings.fontFamily,
+                          fontSize: 10,
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isSelected)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Icon(
+                      Icons.check,
+                      color: context.colors.primary,
+                      size: 24,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
