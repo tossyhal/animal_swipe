@@ -38,9 +38,10 @@ class AnimalImage {
       );
     } else if (type == 'dog') {
       // The Dog API のパースロジック
+      final url = json['url'] as String? ?? '';
       return AnimalImage(
-        id: json['id'] ?? '',
-        url: json['url'] ?? '',
+        id: json['id'] as String? ?? url,
+        url: url,
         type: 'dog',
         description:
             json['breeds']?.isNotEmpty == true

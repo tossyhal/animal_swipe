@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../models/animal_model.dart';
@@ -15,6 +16,8 @@ abstract class IApiService {
 /// APIサービスクラス
 /// 各種動物画像を取得するためのサービス
 class ApiService implements IApiService {
+  static const Duration _requestTimeout = Duration(seconds: 12);
+
   /// APIのURLマッピング
   /// 'cat' は cataas、'dog' は Dog API を使用
   final Map<String, String> _apiUrls = {
@@ -26,17 +29,18 @@ class ApiService implements IApiService {
   /// 各動物タイプごとに画像を取得し、取得した画像をシャッフルして返す
   @override
   Future<List<AnimalImage>> fetchImages(List<String> types) async {
-    List<AnimalImage> allImages = [];
-
-    // 各動物タイプごとに画像を取得
-    for (final type in types) {
-      try {
-        final images = await _fetchImagesForType(type);
-        allImages.addAll(images);
-      } catch (e) {
-        AppLogger.error('Error fetching $type images', e);
-      }
-    }
+    final uniqueTypes = types.toSet();
+    final results = await Future.wait(
+      uniqueTypes.map((type) async {
+        try {
+          return await _fetchImagesForType(type);
+        } catch (e) {
+          AppLogger.error('Error fetching $type images', e);
+          return <AnimalImage>[];
+        }
+      }),
+    );
+    final allImages = results.expand((images) => images).toList();
 
     // 画像リストをシャッフル
     allImages.shuffle();
@@ -54,7 +58,7 @@ class ApiService implements IApiService {
 
     if (type == 'dog') {
       // Dog API の場合：JSON構造が { "message": [ ... ], "status": "success" } になっているため、messageから取得
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url)).timeout(_requestTimeout);
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body) as Map<String, dynamic>;
         if (jsonData['status'] == 'success') {
@@ -73,7 +77,9 @@ class ApiService implements IApiService {
       // ここでは、適当に 0〜999 の間の値をskipに設定
       final randomSkip = Random().nextInt(1000);
       final catUrl = '$url?limit=10&skip=$randomSkip';
-      final response = await http.get(Uri.parse(catUrl));
+      final response = await http
+          .get(Uri.parse(catUrl))
+          .timeout(_requestTimeout);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body) as List<dynamic>;
         return data.map((item) => AnimalImage.fromJson(item, type)).toList();
