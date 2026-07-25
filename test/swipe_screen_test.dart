@@ -9,6 +9,7 @@ import 'package:animal_swipe/services/api_service.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
 import 'package:animal_swipe/widgets/swipe_card.dart';
+import 'package:animal_swipe/constants/app_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // テスト用の FakeSharedPreferences の簡易実装
@@ -151,7 +152,7 @@ void main() {
         expect(find.byType(AppBar), findsOneWidget);
         // ホームボタンの確認
         expect(find.byIcon(Icons.home), findsOneWidget);
-        expect(find.text('ホームに戻る'), findsOneWidget);
+        expect(find.text(AppStrings.homeButton), findsOneWidget);
       });
 
       testWidgets('画像がある場合、SwipeCardが表示されること', (tester) async {
@@ -186,7 +187,7 @@ void main() {
         );
 
         expect(find.byType(CircularProgressIndicator), findsOneWidget);
-        expect(find.text('読み込み中...'), findsOneWidget);
+        expect(find.text(AppStrings.loading), findsOneWidget);
         expect(find.byType(SwipeCard), findsNothing);
       });
     });
@@ -233,7 +234,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         // スナックバーが表示されることを確認
-        expect(find.text('お気に入り機能は近日実装予定です'), findsOneWidget);
+        expect(find.text(AppStrings.liked), findsOneWidget);
         // 画像が更新されたことを確認
         expect(fakeNotifier.loadMoreCallCount, greaterThan(0));
       });
@@ -247,7 +248,7 @@ void main() {
         );
 
         // ホームに戻るボタンをタップ
-        await tester.tap(find.text('ホームに戻る'));
+        await tester.tap(find.text(AppStrings.homeButton));
         await tester.pumpAndSettle();
 
         // StartScreenに遷移したことを確認

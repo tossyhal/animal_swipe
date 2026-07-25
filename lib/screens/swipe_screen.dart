@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../constants/app_constants.dart';
+
 import '../constants/app_strings.dart';
 import '../providers/animal_providers.dart';
 import '../theme/theme_extensions.dart';
@@ -20,184 +20,252 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
   @override
   void initState() {
     super.initState();
-    // 画面が描画された後に初期画像を読み込む
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(animalImagesProvider.notifier).loadInitialImages();
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // プロバイダーから動物画像リストを取得
-    final images = ref.watch(animalImagesProvider);
-
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(AppConstants.appBarHeight),
-        child: Container(
-          padding: const EdgeInsets.only(
-            top: AppConstants.appBarTopPadding,
-          ),
-          child: AppBar(
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            actions: [
-              Container(
-                margin: const EdgeInsets.only(
-                  right: AppConstants.paddingMedium,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(
-                    alpha: AppConstants.opacityMediumLow,
-                  ),
-                  borderRadius: BorderRadius.circular(
-                    AppConstants.borderRadiusExtraLarge,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: AppConstants.opacityExtraLow,
-                      ),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TextButton.icon(
-                  icon: const Icon(Icons.home, color: Colors.black87),
-                  label: const Text(
-                    AppStrings.homeButton,
-                    style: TextStyle(
-                      fontSize: AppConstants.fontSizeSmall,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: AppStrings.fontFamily,
-                    ),
-                  ),
-                  onPressed: () {
-                    // スタート画面へ戻る
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const StartScreen()),
-                    );
-                  },
-                ),
+  void _showLikedMessage() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.favorite, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Text(
+                AppStrings.liked,
+                style: TextStyle(fontFamily: AppStrings.fontFamily),
               ),
             ],
           ),
+          backgroundColor: context.colors.secondary,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1300),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
+      );
+  }
+
+  void _skip() {
+    ref.read(animalImagesProvider.notifier).removeTopImage();
+  }
+
+  void _like() {
+    _showLikedMessage();
+    ref.read(animalImagesProvider.notifier).removeTopImage();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = ref.watch(animalImagesProvider);
+    final isLoading = ref.watch(animalImagesLoadingProvider);
+    final errorMessage = ref.watch(animalImagesErrorProvider);
+    final hasImage = images.isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: context.colors.primary,
+        foregroundColor: Colors.white,
+        titleSpacing: 20,
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.pets_rounded, size: 21),
+            SizedBox(width: 8),
+            Text(
+              AppStrings.appName,
+              style: TextStyle(
+                fontFamily: AppStrings.fontFamily,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              icon: const Icon(Icons.home, size: 19),
+              label: const Text(
+                AppStrings.homeButton,
+                style: TextStyle(
+                  fontFamily: AppStrings.fontFamily,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute<void>(builder: (_) => const StartScreen()),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       body: GradientBackground(
         child: SafeArea(
+          top: false,
           child: Padding(
-            padding: const EdgeInsets.only(
-              top: AppConstants.paddingMedium,
-              left: AppConstants.paddingMedium,
-              right: AppConstants.paddingMedium,
-              bottom: AppConstants.paddingLarge,
-            ),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(
-                    vertical: AppConstants.paddingMedium,
+                const Text(
+                  AppStrings.discoverTitle,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: AppStrings.fontFamily,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                // 画像表示エリア
-                Expanded(
-                  child:
-                      images.isEmpty
-                          ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(
-                                  height: AppConstants.paddingMedium,
-                                ),
-                                const Text(
-                                  AppStrings.loading,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontFamily: AppStrings.fontFamily,
-                                    fontSize: AppConstants.fontSizeMedium,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                          : SwipeCard(
-                            image: images.first,
-                            onSwipeLeft: () {
-                              // 左スワイプ時の処理：トップ画像をリストから削除
-                              ref
-                                  .read(animalImagesProvider.notifier)
-                                  .removeTopImage();
-                            },
-                            onSwipeRight: () {
-                              // 右スワイプ時の処理：トップ画像をリストから削除
-                              ref
-                                  .read(animalImagesProvider.notifier)
-                                  .removeTopImage();
-                            },
-                          ),
+                const SizedBox(height: 2),
+                const Text(
+                  AppStrings.discoverSubtitle,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontFamily: AppStrings.fontFamily,
+                    fontSize: 13,
+                  ),
                 ),
-                const SizedBox(height: AppConstants.paddingLarge),
-                // 下部ボタン群
+                const SizedBox(height: 14),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child:
+                        hasImage
+                            ? SwipeCard(
+                              key: ValueKey(images.first.url),
+                              image: images.first,
+                              onSwipeLeft: _skip,
+                              onSwipeRight: _like,
+                            )
+                            : errorMessage != null && !isLoading
+                            ? _LoadError(
+                              onRetry: () {
+                                ref
+                                    .read(animalImagesProvider.notifier)
+                                    .loadInitialImages();
+                              },
+                            )
+                            : const _LoadingState(),
+                  ),
+                ),
+                const SizedBox(height: 18),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ActionButton(
-                      onPressed:
-                          images.isEmpty
-                              ? null
-                              : () {
-                                // × ボタン押下時：トップ画像を削除
-                                ref
-                                    .read(animalImagesProvider.notifier)
-                                    .removeTopImage();
-                              },
+                      onPressed: hasImage ? _skip : null,
                       icon: Icons.close,
                       backgroundColor: context.colors.error,
+                      label: AppStrings.skip,
                     ),
-                    const SizedBox(width: AppConstants.paddingLarge),
+                    const SizedBox(width: 44),
                     ActionButton(
-                      onPressed:
-                          images.isEmpty
-                              ? null
-                              : () {
-                                // お気に入り機能は後日実装予定
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text(
-                                      AppStrings.favoriteFeatureComingSoon,
-                                    ),
-                                    backgroundColor: context.colors.primary,
-                                    duration: const Duration(seconds: 2),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppConstants.borderRadiusSmall,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                                // スワイプ処理と同様にトップ画像を削除
-                                ref
-                                    .read(animalImagesProvider.notifier)
-                                    .removeTopImage();
-                              },
+                      onPressed: hasImage ? _like : null,
                       icon: Icons.favorite,
-                      backgroundColor: Colors.pink,
+                      backgroundColor: context.colors.secondary,
+                      label: AppStrings.like,
                     ),
                   ],
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingState extends StatelessWidget {
+  const _LoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 42,
+            height: 42,
+            child: CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 3,
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            AppStrings.loading,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontFamily: AppStrings.fontFamily,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _LoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: context.colors.surface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.cloud_off_rounded,
+                size: 46,
+                color: context.colors.primary,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                AppStrings.loadErrorTitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: AppStrings.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                AppStrings.loadErrorMessage,
+                textAlign: TextAlign.center,
+                style: context.textTheme.bodyMedium?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text(AppStrings.retry),
+              ),
+            ],
           ),
         ),
       ),
