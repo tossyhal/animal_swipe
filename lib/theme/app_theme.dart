@@ -84,10 +84,12 @@ class AppTheme {
         onPrimaryContainer: AppColors.onPrimaryContainer,
         secondary: AppColors.secondary,
         tertiary: AppColors.tertiary,
-        surface: Colors.white,
+        surface: AppColors.canvas,
+        onSurface: AppColors.ink,
         error: AppColors.error,
       ),
-      textTheme: _buildTextTheme(textColor: Colors.black),
+      scaffoldBackgroundColor: AppColors.canvas,
+      textTheme: _buildTextTheme(textColor: AppColors.ink),
       cardTheme: _buildCardTheme(),
       elevatedButtonTheme: _buildElevatedButtonTheme(),
       appBarTheme: _buildAppBarTheme(
@@ -96,6 +98,7 @@ class AppTheme {
       ),
       brightness: Brightness.light,
       useMaterial3: true,
+      visualDensity: VisualDensity.standard,
     );
   }
 

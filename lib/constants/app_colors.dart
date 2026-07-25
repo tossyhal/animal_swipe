@@ -5,16 +5,18 @@ class AppColors {
   AppColors._();
 
   // Primary Colors
-  static const Color primary = Color(0xFF78A083);
-  static const Color primaryContainer = Color(0xFFD8E9DD);
-  static const Color onPrimaryContainer = Color(0xFF2C4B34);
+  static const Color primary = Color(0xFF557C64);
+  static const Color primaryContainer = Color(0xFFE1EEE5);
+  static const Color onPrimaryContainer = Color(0xFF183C27);
 
   // Secondary Colors
-  static const Color secondary = Color(0xFFE8A87C);
-  static const Color tertiary = Color(0xFFF5C09A);
+  static const Color secondary = Color(0xFFF09A76);
+  static const Color tertiary = Color(0xFFF8CFAE);
+  static const Color canvas = Color(0xFFF8F5EF);
+  static const Color ink = Color(0xFF233129);
 
   // Error Color
-  static const Color error = Color(0xFFE76F51);
+  static const Color error = Color(0xFFD95D50);
 
   // Dark Theme Surface
   static const Color darkSurface = Color(0xFF1E1E1E);

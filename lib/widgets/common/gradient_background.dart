@@ -1,28 +1,25 @@
 import 'package:flutter/material.dart';
-import '../../constants/app_constants.dart';
 
 /// グラデーション背景ウィジェット
 class GradientBackground extends StatelessWidget {
   final Widget child;
 
-  const GradientBackground({
-    super.key,
-    required this.child,
-  });
+  const GradientBackground({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Theme.of(context)
-                .colorScheme
-                .primary
-                .withValues(alpha: AppConstants.opacityMedium),
-            Theme.of(context).colorScheme.primaryContainer,
+            Theme.of(context).colorScheme.primary,
+            Color.lerp(
+              Theme.of(context).colorScheme.primary,
+              Theme.of(context).colorScheme.secondary,
+              0.28,
+            )!,
           ],
         ),
       ),
