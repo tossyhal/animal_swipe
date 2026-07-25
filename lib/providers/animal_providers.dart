@@ -4,6 +4,12 @@ import '../services/api_service.dart';
 import '../services/prefs_service.dart';
 import '../utils/logger.dart';
 
+/// 画像取得中かどうかをUIへ通知するプロバイダー
+final animalImagesLoadingProvider = StateProvider<bool>((ref) => false);
+
+/// 初期画像の取得に失敗した場合のメッセージ
+final animalImagesErrorProvider = StateProvider<String?>((ref) => null);
+
 /// 選択された動物タイプを管理するプロバイダー
 final selectedAnimalTypesProvider =
     StateNotifierProvider<SelectedAnimalTypesNotifier, List<String>>((ref) {
@@ -42,19 +48,46 @@ final animalImagesProvider =
     StateNotifierProvider<AnimalImagesNotifier, List<AnimalImage>>((ref) {
       final apiService = ref.watch(apiServiceProvider);
       final selectedTypes = ref.watch(selectedAnimalTypesProvider);
-      return AnimalImagesNotifier(apiService, selectedTypes);
+      return AnimalImagesNotifier(
+        apiService,
+        selectedTypes,
+        onLoadingChanged: (value) {
+          ref.read(animalImagesLoadingProvider.notifier).state = value;
+        },
+        onErrorChanged: (value) {
+          ref.read(animalImagesErrorProvider.notifier).state = value;
+        },
+      );
     });
 
 /// 動物画像のリストを管理するStateNotifier
 class AnimalImagesNotifier extends StateNotifier<List<AnimalImage>> {
   final IApiService _apiService;
   final List<String> _selectedTypes;
+  final void Function(bool value)? _onLoadingChanged;
+  final void Function(String? message)? _onErrorChanged;
   bool _isLoading = false;
 
   /// 画像追加読み込みの閾値
   static const int _loadMoreThreshold = 3;
 
-  AnimalImagesNotifier(this._apiService, this._selectedTypes) : super([]);
+  AnimalImagesNotifier(
+    this._apiService,
+    this._selectedTypes, {
+    void Function(bool value)? onLoadingChanged,
+    void Function(String? message)? onErrorChanged,
+  }) : _onLoadingChanged = onLoadingChanged,
+       _onErrorChanged = onErrorChanged,
+       super([]);
+
+  void _setLoading(bool value) {
+    _isLoading = value;
+    _onLoadingChanged?.call(value);
+  }
+
+  void _setError(String? message) {
+    _onErrorChanged?.call(message);
+  }
 
   /// 初期画像を読み込む処理
   Future<void> loadInitialImages() async {
@@ -62,15 +95,19 @@ class AnimalImagesNotifier extends StateNotifier<List<AnimalImage>> {
     if (_isLoading) return;
 
     try {
-      _isLoading = true;
+      _setLoading(true);
+      _setError(null);
       final imagesList = await _apiService.fetchImages(_selectedTypes);
-      if (state.isEmpty) {
+      if (imagesList.isEmpty) {
+        _setError('画像を取得できませんでした');
+      } else if (state.isEmpty) {
         state = imagesList;
       }
     } catch (e) {
       AppLogger.error('Error in loadInitialImages', e);
+      _setError('画像を取得できませんでした');
     } finally {
-      _isLoading = false;
+      _setLoading(false);
     }
   }
 
@@ -80,13 +117,19 @@ class AnimalImagesNotifier extends StateNotifier<List<AnimalImage>> {
     if (_isLoading) return;
 
     try {
-      _isLoading = true;
+      _setLoading(true);
       final moreImages = await _apiService.fetchImages(_selectedTypes);
-      state = [...state, ...moreImages];
+      if (moreImages.isNotEmpty) {
+        final existingUrls = state.map((image) => image.url).toSet();
+        state = [
+          ...state,
+          ...moreImages.where((image) => !existingUrls.contains(image.url)),
+        ];
+      }
     } catch (e) {
       AppLogger.error('Error in loadMoreImages', e);
     } finally {
-      _isLoading = false;
+      _setLoading(false);
     }
   }
 

@@ -23,6 +23,11 @@ class MockApiService implements IApiService {
   }
 }
 
+class EmptyApiService implements IApiService {
+  @override
+  Future<List<AnimalImage>> fetchImages(List<String> types) async => [];
+}
+
 void main() {
   group('AnimalImagesNotifier テスト', () {
     late ProviderContainer container;
@@ -66,6 +71,25 @@ void main() {
       // トップ画像が削除され、残り件数が閾値以下なら追加読み込みが行われるため、
       // 件数が初期より減少しているが、場合によっては追加で増えている可能性がある
       expect(afterRemovalLength >= initialLength - 1, true);
+    });
+
+    test('画像を取得できない場合はエラー状態を通知する', () async {
+      final loadingStates = <bool>[];
+      final errors = <String?>[];
+      final notifier = AnimalImagesNotifier(
+        EmptyApiService(),
+        selectedTypes,
+        onLoadingChanged: loadingStates.add,
+        onErrorChanged: errors.add,
+      );
+      addTearDown(notifier.dispose);
+
+      await notifier.loadInitialImages();
+
+      expect(notifier.state, isEmpty);
+      expect(loadingStates, [true, false]);
+      expect(errors.first, isNull);
+      expect(errors.last, isNotNull);
     });
   });
 }
