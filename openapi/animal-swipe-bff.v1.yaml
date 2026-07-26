@@ -1,0 +1,519 @@
+openapi: 3.1.0
+
+info:
+  title: animal_swipe BFF API
+  version: 1.0.0
+  summary: 外部動物画像 API を集約し、共通形式へ正規化して返す BFF
+  description: |
+    Flutter PWA (animal_swipe) 向けの Backend for Frontend。
+
+    設計判断の背景は `docs/adr/0001-bff-introduction.md` を参照。
+
+    ## 設計上の不変条件
+
+    - **任意 URL を取得するオープンプロキシではない。** URL を受け取るクエリパラメータは存在せず、
+      追加してはならない。取得先は allowlist された `types` から一意に決まる。
+    - `items[].imageUrl` は必ず HTTPS かつ許可ホスト（`cataas.com` / `images.dog.ceo`）の
+      **完全一致**であることをサーバー側で検証済み。検証を通らない URL はレスポンスに含まれない。
+    - 秘密情報はクライアントへ渡らない。API キーが必要な取得元は Functions 側の Secret Manager で扱う。
+
+    ## キャッシュ
+
+    - `GET /api/v1/animals` の成功応答は最大 5 分（`s-maxage=300`）。
+      サーバー側キャッシュから返す場合は、**元の取得時刻から数えた残り秒数**を設定する
+      （応答のたびに満了値へリセットしないため、実効的な鮮度が 5 分を超えない）。
+    - 部分成功（`partial: true`）の応答は `Cache-Control: no-store`。縮退結果を共有キャッシュへ載せない。
+    - `GET /api/v1/animals/daily` は、**返した `date` に対応する** JST 深夜 0 時までの
+      残り秒数を `s-maxage` に設定する。処理中に日付を跨いだ場合は `no-store` になる。
+  contact:
+    name: animal_swipe
+    url: https://github.com/tossyhal/animal_swipe
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: https://animal-swipe-596cc.web.app
+    description: 本番（Firebase Hosting rewrite `/api/**` → Functions `api`）
+  - url: http://127.0.0.1:5000
+    description: ローカル（Firebase エミュレータ Hosting）
+
+tags:
+  - name: animals
+    description: 動物画像の取得
+
+paths:
+  /api/v1/animals:
+    get:
+      tags: [animals]
+      operationId: listAnimals
+      summary: 動物画像を取得する
+      description: |
+        指定された動物種の画像を、対応する外部プロバイダーから並行取得し、
+        重複排除・シャッフルのうえ最大 `limit` 件返す。
+
+        一部のプロバイダーだけが失敗した場合も HTTP 200 を返し、
+        取得できた `items` に加えて `partial: true` と `warnings[]` で通知する。
+      parameters:
+        - $ref: '#/components/parameters/Types'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: |
+            成功、または部分成功。`partial` で区別する。
+            全プロバイダーが失敗しても、許容範囲内（取得から 60 分以内）の
+            stale キャッシュがある場合はここで返す（`warnings` に `STALE_CACHE_SERVED`）。
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+            Vary:
+              $ref: '#/components/headers/Vary'
+            X-Cache:
+              $ref: '#/components/headers/XCache'
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/AccessControlAllowOrigin'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnimalsResponse'
+              examples:
+                success:
+                  summary: 全プロバイダー成功
+                  value:
+                    items:
+                      - id: 'cataas:5f5a6b1c1c9d440000d1f1a1'
+                        type: cat
+                        imageUrl: 'https://cataas.com/cat/5f5a6b1c1c9d440000d1f1a1?width=800'
+                        breed: null
+                        source: cataas
+                      - id: 'dogceo:breeds/hound-afghan/n02088094_1003.jpg'
+                        type: dog
+                        imageUrl: 'https://images.dog.ceo/breeds/hound-afghan/n02088094_1003.jpg'
+                        breed: Afghan Hound
+                        source: dogceo
+                    partial: false
+                    warnings: []
+                partial:
+                  summary: 部分成功（cataas がタイムアウト）
+                  value:
+                    items:
+                      - id: 'dogceo:breeds/beagle/n02088364_11136.jpg'
+                        type: dog
+                        imageUrl: 'https://images.dog.ceo/breeds/beagle/n02088364_11136.jpg'
+                        breed: Beagle
+                        source: dogceo
+                    partial: true
+                    warnings:
+                      - source: cataas
+                        code: PROVIDER_TIMEOUT
+                        message: タイムアウトしました。
+                stale:
+                  summary: 全滅だが stale キャッシュを返した
+                  value:
+                    items:
+                      - id: 'cataas:5f5a6b1c1c9d440000d1f1a1'
+                        type: cat
+                        imageUrl: 'https://cataas.com/cat/5f5a6b1c1c9d440000d1f1a1?width=800'
+                        breed: null
+                        source: cataas
+                    partial: true
+                    warnings:
+                      - source: cataas
+                        code: PROVIDER_TIMEOUT
+                        message: タイムアウトしました。
+                      - source: dogceo
+                        code: PROVIDER_UNAVAILABLE
+                        message: 一時的なエラー応答です (status=503)。
+                      - source: null
+                        code: STALE_CACHE_SERVED
+                        message: 全ての取得元が失敗したため、期限切れのキャッシュを返しました。
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/UpstreamUnavailable'
+
+    options:
+      tags: [animals]
+      operationId: preflightAnimals
+      summary: CORS プリフライト
+      responses:
+        '204':
+          description: プリフライト成功（本文なし）
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/AccessControlAllowOrigin'
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                const: 'GET, OPTIONS'
+            Vary:
+              $ref: '#/components/headers/Vary'
+
+  /api/v1/animals/daily:
+    get:
+      tags: [animals]
+      operationId: getDailyAnimal
+      summary: 今日の1枚を取得する
+      description: |
+        JST の日付ごとに 1 件を選出し、その日の間は固定して返す（#35）。
+        初回リクエストで選出・保存し、以降は Firestore キャッシュから返す。
+        保存は create-if-absent（トランザクション）で行うため、同時リクエストが
+        発生しても全員が同じ 1 件を受け取る。
+        エントリは翌日以降に Firestore の TTL ポリシー（`purgeAt`）で自動削除される。
+      responses:
+        '200':
+          description: 今日の1枚
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+            Vary:
+              $ref: '#/components/headers/Vary'
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/AccessControlAllowOrigin'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyResponse'
+              examples:
+                success:
+                  value:
+                    date: '2026-07-27'
+                    item:
+                      id: 'dogceo:breeds/pug/n02110958_15626.jpg'
+                      type: dog
+                      imageUrl: 'https://images.dog.ceo/breeds/pug/n02110958_15626.jpg'
+                      breed: Pug
+                      source: dogceo
+                    warnings: []
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/UpstreamUnavailable'
+
+components:
+  parameters:
+    Types:
+      name: types
+      in: query
+      required: false
+      description: |
+        取得する動物種のカンマ区切りリスト。**allowlist 方式**で検証する。
+
+        - 許可値: `cat`, `dog`（完全一致・小文字のみ）
+        - 未知の値が 1 つでも含まれる場合は 400。既知の値だけを黙って採用することはしない
+        - 重複は排除される。順序は結果に影響しない
+        - 省略時は許可値すべて（`cat,dog`）
+      schema:
+        type: string
+        pattern: '^(cat|dog)(,(cat|dog))*$'
+        default: 'cat,dog'
+      examples:
+        both:
+          value: 'cat,dog'
+        catOnly:
+          value: 'cat'
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: |
+        返す `items` の最大件数。10 進整数のみ。
+
+        - 範囲: 1 以上 30 以下。範囲外・非整数（`1.5`, `0x10`, `1e3`, `abc` 等）は 400
+        - 範囲外の値を上限へ丸めることはしない（誤ったクライアント実装を隠さないため）
+        - 実際の件数はこれより少なくなり得る（プロバイダー失敗、URL 検証による除外、重複排除）
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 30
+        default: 10
+
+  headers:
+    CacheControl:
+      description: |
+        一覧の成功時は `public, max-age=0, s-maxage={残り秒数}`（上限 300）。
+        残り秒数は返した内容の取得時刻から数えるため、キャッシュヒット時は 300 未満になり得る。
+        今日の1枚は返した `date` の JST 深夜 0 時までの残り秒数を `s-maxage` に設定する。
+        部分成功（`partial: true`）およびエラー時、および残り秒数が 0 以下の場合は `no-store`。
+      schema:
+        type: string
+    Vary:
+      description: origin ごとに CORS ヘッダーが変わるため常に `Origin`。
+      schema:
+        type: string
+        const: Origin
+    XCache:
+      description: |
+        キャッシュの利用状況。`hit` = 有効なキャッシュから返した、
+        `miss` = 外部 API から取得した、`stale` = 全滅により期限切れキャッシュを返した。
+      schema:
+        type: string
+        enum: [hit, miss, stale]
+    AccessControlAllowOrigin:
+      description: |
+        許可 origin（`https://animal-swipe-596cc.web.app`）と完全一致する場合のみ、
+        その origin をそのままエコーする。`*` は返さない。許可外の origin では本ヘッダー自体を付けない。
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    AnimalType:
+      type: string
+      enum: [cat, dog]
+      description: 動物種。allowlist と同一。
+
+    SourceId:
+      type: string
+      enum: [cataas, dogceo]
+      description: 取得元プロバイダーの識別子。
+
+    AnimalItem:
+      type: object
+      description: 正規化済みの動物画像 1 件。
+      required: [id, type, imageUrl, breed, source]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: |
+            `"{source}:{providerStableId}"` 形式の安定 ID。**null 不可**。
+
+            - 同じ画像に対しては常に同じ値になる（重複排除のキー）
+            - `cataas`: 外部の `id`（または `_id`）
+            - `dogceo`: 画像 URL のパス（Dog CEO が ID を返さないため）
+          examples:
+            - 'cataas:5f5a6b1c1c9d440000d1f1a1'
+            - 'dogceo:breeds/beagle/n02088364_11136.jpg'
+        type:
+          $ref: '#/components/schemas/AnimalType'
+        imageUrl:
+          type: string
+          format: uri
+          description: |
+            画像の URL。**null 不可**。サーバー側で次を検証済み。
+
+            - スキームが `https:` であること
+            - ホスト名が `cataas.com` または `images.dog.ceo` に**完全一致**すること
+            - ユーザー情報（`user:pass@`）と明示ポートを含まないこと
+
+            検証を通らない URL の項目はレスポンスから除外されるため、
+            クライアントは本フィールドを非 null として扱ってよい。
+          examples:
+            - 'https://cataas.com/cat/5f5a6b1c1c9d440000d1f1a1?width=800'
+            - 'https://images.dog.ceo/breeds/beagle/n02088364_11136.jpg'
+        breed:
+          type: [string, 'null']
+          description: |
+            品種名。**null 可**。取得元が品種情報を提供しない、
+            または URL から確実に判別できない場合は `null`。推測はしない。
+
+            - `cataas`: 常に `null`
+            - `dogceo`: 画像 URL のパス（`/breeds/hound-afghan/...`）から復元。
+              想定外のパス形状では `null`
+          examples:
+            - 'Afghan Hound'
+            - null
+        source:
+          $ref: '#/components/schemas/SourceId'
+
+    WarningCode:
+      type: string
+      enum:
+        - PROVIDER_TIMEOUT
+        - PROVIDER_UNAVAILABLE
+        - PROVIDER_INVALID_RESPONSE
+        - STALE_CACHE_SERVED
+        - INSUFFICIENT_ITEMS
+      description: |
+        | コード | 意味 |
+        | --- | --- |
+        | `PROVIDER_TIMEOUT` | 再試行を含めてタイムアウトした |
+        | `PROVIDER_UNAVAILABLE` | ネットワークエラー、または回復しない HTTP エラー応答 |
+        | `PROVIDER_INVALID_RESPONSE` | 契約と異なる形状のレスポンスだった |
+        | `STALE_CACHE_SERVED` | 全プロバイダー失敗のため期限切れキャッシュを返した |
+        | `INSUFFICIENT_ITEMS` | 呼び出しは成功したが利用可能な画像が 0 件だった |
+
+    Warning:
+      type: object
+      description: 部分失敗・縮退をクライアントへ伝える警告。ユーザーへの表示可否はクライアントが判断する。
+      required: [source, code, message]
+      additionalProperties: false
+      properties:
+        source:
+          oneOf:
+            - $ref: '#/components/schemas/SourceId'
+            - type: 'null'
+          description: 対象プロバイダー。特定のプロバイダーに紐づかない警告では `null`。
+        code:
+          $ref: '#/components/schemas/WarningCode'
+        message:
+          type: string
+          description: |
+            人間向けの短い説明（日本語）。**null 不可**。
+            外部 API のレスポンス本文や URL は含めない。文言は予告なく変わり得るため、
+            分岐には `code` を使うこと。
+
+    AnimalsResponse:
+      type: object
+      required: [items, partial, warnings]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          description: |
+            正規化済みの画像リスト。**null 不可**（0 件のときは空配列）。
+            `limit` 以下の長さ。`id` で重複排除済み。順序はシャッフルされる。
+          maxItems: 30
+          items:
+            $ref: '#/components/schemas/AnimalItem'
+        partial:
+          type: boolean
+          description: |
+            1 つ以上のプロバイダーが失敗した、または stale キャッシュを返した場合に `true`。
+            `true` のとき `warnings` は必ず 1 件以上。
+        warnings:
+          type: array
+          description: 警告リスト。**null 不可**（無いときは空配列）。
+          items:
+            $ref: '#/components/schemas/Warning'
+
+    DailyResponse:
+      type: object
+      required: [date, item, warnings]
+      additionalProperties: false
+      properties:
+        date:
+          type: string
+          format: date
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: JST の日付（`YYYY-MM-DD`）。**null 不可**。
+        item:
+          $ref: '#/components/schemas/AnimalItem'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Warning'
+
+    ErrorCode:
+      type: string
+      enum:
+        - INVALID_ANIMAL_TYPE
+        - INVALID_LIMIT
+        - METHOD_NOT_ALLOWED
+        - NOT_FOUND
+        - UPSTREAM_UNAVAILABLE
+        - INTERNAL_ERROR
+      description: |
+        | コード | HTTP | 意味 |
+        | --- | --- | --- |
+        | `INVALID_ANIMAL_TYPE` | 400 | `types` に allowlist 外の値が含まれる |
+        | `INVALID_LIMIT` | 400 | `limit` が整数でない、または 1..30 の範囲外 |
+        | `METHOD_NOT_ALLOWED` | 405 | GET / OPTIONS 以外 |
+        | `NOT_FOUND` | 404 | 未知のパス |
+        | `UPSTREAM_UNAVAILABLE` | 502 | 全プロバイダー失敗、かつ利用可能な stale キャッシュ無し |
+        | `INTERNAL_ERROR` | 500 | BFF 自身の想定外エラー |
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              $ref: '#/components/schemas/ErrorCode'
+            message:
+              type: string
+              description: 人間向けの説明（日本語）。内部スタックトレースや外部レスポンス本文は含めない。
+            field:
+              type: string
+              description: 入力検証エラーの原因となったクエリパラメータ名。検証エラー以外では省略される。
+              examples: [types, limit]
+
+  responses:
+    BadRequest:
+      description: |
+        入力検証エラー。**この場合、外部 API へのリクエストは一切行われない。**
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidType:
+              summary: allowlist 外の types
+              value:
+                error:
+                  code: INVALID_ANIMAL_TYPE
+                  message: 'types に未対応の値が含まれています。許可値: cat, dog'
+                  field: types
+            invalidLimit:
+              summary: 上限超過の limit
+              value:
+                error:
+                  code: INVALID_LIMIT
+                  message: limit は 1 以上 30 以下で指定してください。
+                  field: limit
+
+    MethodNotAllowed:
+      description: GET / OPTIONS 以外のメソッド。
+      headers:
+        Allow:
+          schema:
+            type: string
+            const: 'GET, OPTIONS'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: METHOD_NOT_ALLOWED
+                  message: GET のみ許可されています。
+
+    UpstreamUnavailable:
+      description: |
+        全プロバイダーが失敗し、利用可能な stale キャッシュも無い。
+        BFF 自身の不具合（500）と区別するため 502 を使う。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: UPSTREAM_UNAVAILABLE
+                  message: 全ての取得元から画像を取得できませんでした。
+
+    InternalError:
+      description: BFF 自身の想定外エラー。内部詳細はクライアントへ返さない。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: INTERNAL_ERROR
+                  message: 内部エラーが発生しました。
