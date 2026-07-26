@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../models/animal_model.dart';
+import '../theme/theme_extensions.dart';
 
 class SwipeCard extends StatefulWidget {
   final AnimalImage image;
@@ -154,6 +155,7 @@ class _SwipeCardState extends State<SwipeCard>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     // 回転角度 = _dragOffset.dx / 800
     final rotationAngle = _dragOffset.dx / 900;
     final isLiked = _dragOffset.dx > 0;
@@ -211,9 +213,7 @@ class _SwipeCardState extends State<SwipeCard>
                                                 : null,
                                             valueColor:
                                                 AlwaysStoppedAnimation<Color>(
-                                                  Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary,
+                                                  colors.primary,
                                                 ),
                                           ),
                                         );
@@ -227,18 +227,14 @@ class _SwipeCardState extends State<SwipeCard>
                                           Icon(
                                             Icons.error_outline,
                                             size: 48,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.error,
+                                            color: colors.error,
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
                                             '画像の読み込みに失敗しました',
                                             style: TextStyle(
                                               fontFamily: 'MPLUSRounded1c',
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.error,
+                                              color: colors.error,
                                             ),
                                           ),
                                         ],
@@ -259,7 +255,7 @@ class _SwipeCardState extends State<SwipeCard>
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
                                       colors: [
-                                        Colors.black.withValues(alpha: 0.4),
+                                        colors.scrim.withValues(alpha: 0.4),
                                         Colors.transparent,
                                       ],
                                     ),
@@ -278,7 +274,7 @@ class _SwipeCardState extends State<SwipeCard>
                                       begin: Alignment.bottomCenter,
                                       end: Alignment.topCenter,
                                       colors: [
-                                        Colors.black.withValues(alpha: 0.4),
+                                        colors.scrim.withValues(alpha: 0.4),
                                         Colors.transparent,
                                       ],
                                     ),
@@ -290,7 +286,7 @@ class _SwipeCardState extends State<SwipeCard>
                         ),
                         Container(
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
+                            color: colors.surface,
                             borderRadius: const BorderRadius.only(
                               bottomLeft: Radius.circular(28),
                               bottomRight: Radius.circular(28),
@@ -307,9 +303,7 @@ class _SwipeCardState extends State<SwipeCard>
                                     fontSize: 18,
                                     fontFamily: 'MPLUSRounded1c',
                                     fontWeight: FontWeight.bold,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
+                                    color: colors.onSurface,
                                   ),
                                 ),
                               const SizedBox(height: 4),
@@ -321,9 +315,7 @@ class _SwipeCardState extends State<SwipeCard>
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primaryContainer,
+                                      color: colors.primaryContainer,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -332,9 +324,7 @@ class _SwipeCardState extends State<SwipeCard>
                                         fontSize: 14,
                                         fontFamily: 'MPLUSRounded1c',
                                         fontWeight: FontWeight.w500,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
+                                        color: colors.onPrimaryContainer,
                                       ),
                                     ),
                                   ),
@@ -356,23 +346,13 @@ class _SwipeCardState extends State<SwipeCard>
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isLiked
-                            ? Theme.of(
-                                context,
-                              ).colorScheme.secondary.withValues(alpha: 0.9)
-                            : Theme.of(
-                                context,
-                              ).colorScheme.error.withValues(alpha: 0.9),
+                        color: (isLiked ? colors.secondary : colors.error)
+                            .withValues(alpha: 0.9),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                (isLiked
-                                        ? Theme.of(
-                                            context,
-                                          ).colorScheme.secondary
-                                        : Theme.of(context).colorScheme.error)
-                                    .withValues(alpha: 0.5),
+                            color: (isLiked ? colors.secondary : colors.error)
+                                .withValues(alpha: 0.5),
                             blurRadius: 10,
                             spreadRadius: 2,
                           ),
@@ -380,7 +360,7 @@ class _SwipeCardState extends State<SwipeCard>
                       ),
                       child: Icon(
                         isLiked ? Icons.favorite : Icons.close,
-                        color: Colors.white,
+                        color: isLiked ? colors.onSecondary : colors.onError,
                         size: 36,
                       ),
                     ),

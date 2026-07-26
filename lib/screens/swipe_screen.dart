@@ -21,17 +21,23 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
   // 画面側から明示的に初期読み込みを呼ぶ必要はない。
 
   void _showLikedMessage() {
+    // SnackBar の背景は secondary なので、前景は onSecondary
+    final onSnackBar = context.colors.onSecondary;
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.favorite, color: Colors.white, size: 20),
-              SizedBox(width: 10),
+              Icon(Icons.favorite, color: onSnackBar, size: 20),
+              const SizedBox(width: 10),
               Text(
                 AppStrings.liked,
-                style: TextStyle(fontFamily: AppStrings.fontFamily),
+                style: TextStyle(
+                  fontFamily: AppStrings.fontFamily,
+                  color: onSnackBar,
+                ),
               ),
             ],
           ),
@@ -78,12 +84,14 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
         !imagesAsync.isLoading && (imagesAsync.value?.isNotEmpty ?? false);
     // 表示中の山札の世代。カード操作にこれを持ち回らせる
     final deckToken = ref.read(animalImagesProvider.notifier).deckGeneration;
+    // AppBar / GradientBackground はどちらも primary ベースなので前景は onPrimary
+    final onGradient = context.colors.onPrimary;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: context.colors.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: onGradient,
         titleSpacing: 20,
         title: const Row(
           mainAxisSize: MainAxisSize.min,
@@ -104,7 +112,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              style: TextButton.styleFrom(foregroundColor: onGradient),
               icon: const Icon(Icons.home, size: 19),
               label: const Text(
                 AppStrings.homeButton,
@@ -129,20 +137,20 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
             child: Column(
               children: [
-                const Text(
+                Text(
                   AppStrings.discoverTitle,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: onGradient,
                     fontFamily: AppStrings.fontFamily,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
+                Text(
                   AppStrings.discoverSubtitle,
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: onGradient.withValues(alpha: 0.7),
                     fontFamily: AppStrings.fontFamily,
                     fontSize: 13,
                   ),
@@ -180,6 +188,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                       onPressed: hasImage ? () => _skip(deckToken) : null,
                       icon: Icons.close,
                       backgroundColor: context.colors.error,
+                      foregroundColor: context.colors.onError,
                       label: AppStrings.skip,
                     ),
                     const SizedBox(width: 44),
@@ -187,6 +196,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                       onPressed: hasImage ? () => _like(deckToken) : null,
                       icon: Icons.favorite,
                       backgroundColor: context.colors.secondary,
+                      foregroundColor: context.colors.onSecondary,
                       label: AppStrings.like,
                     ),
                   ],
@@ -205,24 +215,24 @@ class _LoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    // GradientBackground（primary ベース）の上に乗るので前景は onPrimary
+    final onGradient = context.colors.onPrimary;
+
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
             width: 42,
             height: 42,
-            child: CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 3,
-            ),
+            child: CircularProgressIndicator(color: onGradient, strokeWidth: 3),
           ),
-          SizedBox(height: 18),
+          const SizedBox(height: 18),
           Text(
             AppStrings.loading,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white,
+              color: onGradient,
               fontFamily: AppStrings.fontFamily,
               fontSize: 15,
             ),

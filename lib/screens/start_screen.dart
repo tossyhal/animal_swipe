@@ -28,6 +28,8 @@ class StartScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedTypes = ref.watch(selectedAnimalTypesProvider);
+    // GradientBackground は primary をベースにするため、その上の前景は onPrimary 系
+    final onGradientMuted = context.colors.onPrimary.withValues(alpha: 0.7);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -81,21 +83,21 @@ class StartScreen extends ConsumerWidget {
                                 );
                               },
                       ),
-                      const Padding(
-                        padding: EdgeInsets.only(top: 28),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 28),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.swipe_rounded,
                               size: 18,
-                              color: Colors.white70,
+                              color: onGradientMuted,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
                               AppStrings.swipeHint,
                               style: TextStyle(
-                                color: Colors.white70,
+                                color: onGradientMuted,
                                 fontFamily: AppStrings.fontFamily,
                                 fontSize: 13,
                               ),
@@ -120,19 +122,22 @@ class _BrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    // GradientBackground（primary ベース）の上に乗るので前景は onPrimary
+    final onGradient = context.colors.onPrimary;
+
+    return Column(
       children: [
         DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white24,
+            color: onGradient.withValues(alpha: 0.24),
             shape: BoxShape.circle,
           ),
           child: Padding(
-            padding: EdgeInsets.all(14),
-            child: Icon(Icons.pets_rounded, color: Colors.white, size: 30),
+            padding: const EdgeInsets.all(14),
+            child: Icon(Icons.pets_rounded, color: onGradient, size: 30),
           ),
         ),
-        SizedBox(height: 14),
+        const SizedBox(height: 14),
         Text(
           AppStrings.appName,
           textAlign: TextAlign.center,
@@ -142,15 +147,15 @@ class _BrandHeader extends StatelessWidget {
             fontFamily: AppStrings.fontFamily,
             fontWeight: FontWeight.bold,
             letterSpacing: -1.5,
-            color: Colors.white,
+            color: onGradient,
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Text(
           AppStrings.tagline,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white,
+            color: onGradient,
             fontFamily: AppStrings.fontFamily,
             fontSize: 15,
           ),
@@ -179,7 +184,7 @@ class _SelectionPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
+            color: context.colors.shadow.withValues(alpha: 0.14),
             blurRadius: 28,
             offset: const Offset(0, 12),
           ),

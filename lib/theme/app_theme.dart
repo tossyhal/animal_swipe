@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
@@ -7,33 +9,76 @@ import '../constants/app_strings.dart';
 class AppTheme {
   AppTheme._();
 
+  /// 2 色間の WCAG コントラスト比
+  static double _contrastRatio(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final lighter = math.max(la, lb);
+    final darker = math.min(la, lb);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  /// [background] の上に乗せる前景色を、ブランドの 2 色
+  /// （[AppColors.canvas] / [AppColors.ink]）のうち
+  /// コントラストの高い方から機械的に選ぶ。
+  /// 手書きで on 系の色を決め打ちしないための補助。
+  @visibleForTesting
+  static Color onColorFor(Color background) {
+    return _contrastRatio(background, AppColors.canvas) >=
+            _contrastRatio(background, AppColors.ink)
+        ? AppColors.canvas
+        : AppColors.ink;
+  }
+
+  /// シード色から M3 の派生色をすべて生成し、
+  /// ブランド固有のアクセント色だけを上書きする。
+  ///
+  /// `primary` / `surface` 系はあえて上書きしない。
+  /// トーナルパレット全体の整合性（`surfaceContainerLowest` 〜
+  /// `surfaceContainerHighest`、`outlineVariant`、`onSurfaceVariant` など）は
+  /// `fromSeed` に任せる方が破綻しないため。
+  @visibleForTesting
+  static ColorScheme buildColorScheme(Brightness brightness) {
+    final base = ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      brightness: brightness,
+    );
+    return base.copyWith(
+      secondary: AppColors.secondary,
+      onSecondary: onColorFor(AppColors.secondary),
+      tertiary: AppColors.tertiary,
+      onTertiary: onColorFor(AppColors.tertiary),
+      error: AppColors.error,
+      onError: onColorFor(AppColors.error),
+    );
+  }
+
   /// 共通のTextTheme設定
-  static TextTheme _buildTextTheme({required Color textColor}) {
-    return TextTheme(
+  ///
+  /// 色は指定しない。`ThemeData` が `colorScheme.onSurface` を基準に
+  /// 自動で解決するため、テーマごとに色を渡す必要はない。
+  static TextTheme _buildTextTheme() {
+    return const TextTheme(
       titleLarge: TextStyle(
         fontFamily: AppStrings.fontFamily,
         fontWeight: FontWeight.bold,
         fontSize: AppConstants.fontSizeXXLarge,
-        color: textColor,
       ),
       bodyLarge: TextStyle(
         fontFamily: AppStrings.fontFamily,
         fontSize: AppConstants.fontSizeMedium,
-        color: textColor,
       ),
       bodyMedium: TextStyle(
         fontFamily: AppStrings.fontFamily,
         fontSize: AppConstants.fontSizeSmall,
-        color: textColor,
       ),
     );
   }
 
   /// 共通のCardTheme設定
-  static CardThemeData _buildCardTheme({Color? cardColor}) {
+  static CardThemeData _buildCardTheme() {
     return CardThemeData(
       elevation: AppConstants.elevationMedium,
-      color: cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusLarge),
       ),
@@ -41,11 +86,13 @@ class AppTheme {
   }
 
   /// 共通のElevatedButtonTheme設定
-  static ElevatedButtonThemeData _buildElevatedButtonTheme() {
+  static ElevatedButtonThemeData _buildElevatedButtonTheme(
+    ColorScheme colorScheme,
+  ) {
     return ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         elevation: AppConstants.elevationLow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
@@ -58,72 +105,37 @@ class AppTheme {
   }
 
   /// 共通のAppBarTheme設定
-  static AppBarTheme _buildAppBarTheme({
-    required Color backgroundColor,
-    required Color foregroundColor,
-  }) {
+  static AppBarTheme _buildAppBarTheme(ColorScheme colorScheme) {
     return AppBarTheme(
       elevation: 0,
-      backgroundColor: backgroundColor,
-      foregroundColor: foregroundColor,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
       centerTitle: true,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         fontFamily: AppStrings.fontFamily,
         fontWeight: FontWeight.bold,
         fontSize: AppConstants.fontSizeXXLarge,
+        color: colorScheme.onPrimary,
       ),
     );
   }
 
-  /// ライトテーマ
-  static ThemeData lightTheme() {
+  static ThemeData _buildTheme(Brightness brightness) {
+    final colorScheme = buildColorScheme(brightness);
     return ThemeData(
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.primary,
-        primaryContainer: AppColors.primaryContainer,
-        onPrimaryContainer: AppColors.onPrimaryContainer,
-        secondary: AppColors.secondary,
-        tertiary: AppColors.tertiary,
-        surface: AppColors.canvas,
-        onSurface: AppColors.ink,
-        error: AppColors.error,
-      ),
-      scaffoldBackgroundColor: AppColors.canvas,
-      textTheme: _buildTextTheme(textColor: AppColors.ink),
+      colorScheme: colorScheme,
+      textTheme: _buildTextTheme(),
       cardTheme: _buildCardTheme(),
-      elevatedButtonTheme: _buildElevatedButtonTheme(),
-      appBarTheme: _buildAppBarTheme(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      brightness: Brightness.light,
+      elevatedButtonTheme: _buildElevatedButtonTheme(colorScheme),
+      appBarTheme: _buildAppBarTheme(colorScheme),
       useMaterial3: true,
       visualDensity: VisualDensity.standard,
     );
   }
 
+  /// ライトテーマ
+  static ThemeData lightTheme() => _buildTheme(Brightness.light);
+
   /// ダークテーマ
-  static ThemeData darkTheme() {
-    return ThemeData(
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.primary,
-        primaryContainer: AppColors.onPrimaryContainer,
-        onPrimaryContainer: AppColors.primaryContainer,
-        secondary: AppColors.secondary,
-        tertiary: AppColors.tertiary,
-        surface: AppColors.darkSurface,
-        error: AppColors.error,
-      ),
-      scaffoldBackgroundColor: AppColors.darkBackground,
-      textTheme: _buildTextTheme(textColor: Colors.white),
-      cardTheme: _buildCardTheme(cardColor: AppColors.darkSurface),
-      elevatedButtonTheme: _buildElevatedButtonTheme(),
-      appBarTheme: _buildAppBarTheme(
-        backgroundColor: AppColors.onPrimaryContainer,
-        foregroundColor: Colors.white,
-      ),
-      brightness: Brightness.dark,
-      useMaterial3: true,
-    );
-  }
+  static ThemeData darkTheme() => _buildTheme(Brightness.dark);
 }
