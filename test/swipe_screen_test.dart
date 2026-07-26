@@ -1,9 +1,12 @@
 // test/swipe_screen_test.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animal_swipe/screens/swipe_screen.dart';
 import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/services/api_service.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
@@ -56,9 +59,10 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   }
 
   @override
-  void removeTopImage() {
+  bool removeTopImage({int? deckToken}) {
     final current = state.value ?? const <AnimalImage>[];
-    if (current.isEmpty) return;
+    if (current.isEmpty) return false;
+    if (deckToken != null && deckToken != deckGeneration) return false;
 
     final rest = current.sublist(1);
     // 画像の残りが閾値未満の場合、追加画像を読み込む
@@ -68,6 +72,7 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
     } else {
       state = AsyncValue.data(rest);
     }
+    return true;
   }
 
   @override
@@ -90,7 +95,27 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
     _shouldSimulateError = shouldError;
   }
 
+
   int get loadMoreCallCount => _loadMoreCallCount;
+}
+
+/// 応答を任意のタイミングまで保留できる ApiService
+class _DeferredApiService implements IApiService {
+  final _pending = <Completer<List<AnimalImage>>>[];
+
+  @override
+  Future<List<AnimalImage>> fetchImages(List<String> types) {
+    final completer = Completer<List<AnimalImage>>();
+    _pending.add(completer);
+    return completer.future;
+  }
+
+  void completeFirstWith(List<String> types) {
+    _pending.removeAt(0).complete([
+      for (final type in types)
+        AnimalImage(id: type, url: 'http://example.com/$type.jpg', type: type),
+    ]);
+  }
 }
 
 void main() {
@@ -322,6 +347,76 @@ void main() {
         await tester.tap(find.byIcon(Icons.favorite));
         await tester.pump();
         expect(fakeNotifier.loadMoreCallCount, 0);
+      });
+    });
+
+    // Fake ではなく実装の Notifier を使い、Riverpod が前回値を保持したまま
+    // AsyncLoading にする「再取得中」の状態を実際に発生させる
+    group('再取得中の挙動（実 Provider）', () {
+      testWidgets('再取得中は前回の値が残っていてもアクションボタンが無効になること', (tester) async {
+        SharedPreferences.setMockInitialValues({
+          'selected_animal_types': ['cat', 'dog'],
+        });
+        final prefs = PrefsService(await SharedPreferences.getInstance());
+        final api = _DeferredApiService();
+        final realContainer = ProviderContainer(
+          overrides: [
+            prefsServiceProvider.overrideWithValue(prefs),
+            apiServiceProvider.overrideWithValue(api),
+          ],
+        );
+        addTearDown(realContainer.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: realContainer,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+
+        // 初回取得を完了させる
+        api.completeFirstWith(['cat', 'dog']);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(SwipeCard), findsOneWidget);
+
+        InkWell skipButton() => tester.widget<InkWell>(
+          find.ancestor(
+            of: find.byIcon(Icons.close),
+            matching: find.byType(InkWell),
+          ),
+        );
+
+        expect(skipButton().onTap, isNotNull, reason: 'カード表示中は操作できる');
+
+        // 選択を変更 → provider が再 build され、前回値を保持したまま
+        // AsyncLoading になる
+        realContainer
+            .read(selectedAnimalTypesProvider.notifier)
+            .selectType('dog', false);
+        await tester.pump();
+
+        // ボタンの無効化はフレーム単位で即座に反映される
+        expect(
+          skipButton().onTap,
+          isNull,
+          reason: '再取得中に古い山札へ操作できてはいけない',
+        );
+
+        // AnimatedSwitcher が退場中のカードを保持している間にスワイプしても、
+        // 古い山札で state を上書きしてはいけない
+        await tester.drag(find.byType(SwipeCard), const Offset(-400, 0));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(
+          realContainer.read(animalImagesProvider).isLoading,
+          isTrue,
+          reason: '退場中のカードへのスワイプで再取得中状態が壊されないこと',
+        );
+
+        // カードの消滅は AnimatedSwitcher の退場アニメーション後
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(SwipeCard), findsNothing, reason: 'ローディング表示に変わる');
+        expect(find.text(AppStrings.loading), findsOneWidget);
       });
     });
   });

@@ -47,3 +47,7 @@ app.*.map.json
 
 # Claude Code のローカル作業用ディレクトリ（worktree など）
 .claude/
+
+# ローカル実行時に生成される一時ディレクトリ
+.tmp_appdata/
+.tmp_localappdata/

@@ -50,6 +50,10 @@ class SelectedAnimalTypesNotifier extends Notifier<List<String>> {
 final animalImagesProvider =
     AsyncNotifierProvider<AnimalImagesNotifier, List<AnimalImage>>(
       AnimalImagesNotifier.new,
+      // スワイプ画面を離れたら破棄し、次に入った時に必ず取り直す。
+      // 保持したままだと、山札が尽きた状態でホームへ戻り同じ選択で再開した際に
+      // build() が再実行されず、ローディング表示のまま進めなくなる。
+      isAutoDispose: true,
       // Riverpod 3 は失敗した provider を既定で自動リトライするが、
       // ここでは無効化して「エラー画面 + 手動リトライ」を UI の責務に保つ。
       // リトライ方針（対象・回数・バックオフ）は #17 で明示的に実装する。
@@ -69,6 +73,25 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
   /// 発行した追加読み込みの通し番号。最後に発行したものだけが「現行」。
   int _loadMoreRequestId = 0;
 
+  /// 山札の世代。取得し直して**別の山札に入れ替わる**たびに増える。
+  /// 追加読み込みで末尾に継ぎ足す場合は同じ山札なので増やさない。
+  ///
+  /// カード操作は表示時点の世代を持ち回り、通知が遅れて届いた時に
+  /// 「その操作は今の山札に対するものか」を判定する。
+  /// ランダム画像 API は同じ画像を返し得るため、URL の一致では
+  /// 山札の同一性を保証できない（Codex レビューの指摘）。
+  ///
+  /// トークンは [_nextDeckToken] から採番する。invalidate で Notifier ごと
+  /// 作り直されるとインスタンス変数は 0 に戻るため、インスタンス内の
+  /// カウンタだと新旧で同じ値が再利用され、古い操作が新しい山札を
+  /// 通過してしまう。プロセス全体で単調増加する採番元を使って避ける。
+  int _deckGeneration = 0;
+
+  /// 山札トークンの採番元（プロセス全体で一意）
+  static int _nextDeckToken = 0;
+
+  int get deckGeneration => _deckGeneration;
+
   @override
   Future<List<AnimalImage>> build() async {
     final apiService = ref.watch(apiServiceProvider);
@@ -78,6 +101,8 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
     // 古い選択に紐づくものなので無効化する
     _loadMoreRequestId++;
     _isLoadingMore = false;
+    // ここから作られるのは新しい山札
+    _deckGeneration = ++_nextDeckToken;
 
     if (selectedTypes.isEmpty) return const [];
 
@@ -114,6 +139,8 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
     if (requestId != _loadMoreRequestId) return;
     if (!_sameTypes(requestedTypes)) return;
 
+    // 取り直した結果は別の山札
+    _deckGeneration = ++_nextDeckToken;
     state = result;
   }
 
@@ -163,9 +190,21 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
   }
 
   /// 一番上の画像を削除し、必要に応じて追加読み込みを実行
-  void removeTopImage() {
+  ///
+  /// [deckToken] にはカードを表示した時点の [deckGeneration] を渡す。
+  /// スワイプアニメーション完了は 250ms 遅れて通知されるため、その間に
+  /// 再取得が完了して別の山札に入れ替わっていることがある。世代が変わって
+  /// いれば、その操作はもう存在しない山札に対するものなので無視する。
+  ///
+  /// 実際に取り除いた場合のみ true を返す。
+  bool removeTopImage({int? deckToken}) {
+    // 再取得中は前回の山札が state に残っているが、それはもう表示対象ではない
+    if (state.isLoading) return false;
+    // 表示時と別の山札に入れ替わっているなら、この操作は古い
+    if (deckToken != null && deckToken != _deckGeneration) return false;
+
     final current = state.value;
-    if (current == null || current.isEmpty) return;
+    if (current == null || current.isEmpty) return false;
 
     final rest = current.sublist(1);
     state = AsyncValue.data(rest);
@@ -174,6 +213,7 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
     if (rest.length < _loadMoreThreshold) {
       loadMoreImages();
     }
+    return true;
   }
 }
 

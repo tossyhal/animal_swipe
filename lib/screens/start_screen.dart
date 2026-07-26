@@ -70,6 +70,12 @@ class StartScreen extends ConsumerWidget {
                                         selectedAnimalTypesProvider.notifier,
                                       )
                                       .saveSelectedTypes();
+                                  // 新しいセッションの開始として山札を必ず取り直す。
+                                  // pushReplacement の遷移中は旧 SwipeScreen と
+                                  // 新 SwipeScreen が重なり購読者が 0 にならないため、
+                                  // autoDispose だけに頼ると山札が尽きたまま
+                                  // 再開されてしまう
+                                  ref.invalidate(animalImagesProvider);
                                   Navigator.of(context).pushReplacement(
                                     MaterialPageRoute<void>(
                                       builder: (_) => const SwipeScreen(),

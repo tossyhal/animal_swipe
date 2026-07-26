@@ -76,6 +76,10 @@ void main() {
     late PrefsService prefsService;
 
     /// 選択済みタイプと ApiService を差し替えた [ProviderContainer] を作る
+    ///
+    /// animalImagesProvider は autoDispose なので、購読者がいないと read 直後に
+    /// 破棄されてしまう。画面が表示され続けている状況を再現するため、
+    /// ダミーの listen で生存させる。
     ProviderContainer createContainer(IApiService apiService) {
       final container = ProviderContainer(
         overrides: [
@@ -84,6 +88,7 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
+      container.listen(animalImagesProvider, (_, _) {}, fireImmediately: true);
       return container;
     }
 
@@ -198,6 +203,80 @@ void main() {
       final images = await container.read(animalImagesProvider.future);
 
       expect(images.map((i) => i.type), ['cat']);
+    });
+
+    // スワイプ完了は 250ms 遅れて通知されるため、その間に再取得が完了して
+    // 山札が入れ替わっていることがある。古い操作で新しい山札を削ってはいけない。
+    //
+    // ランダム画像 API は同じ画像を返し得るので、新旧の山札の先頭 URL が
+    // 一致していても「同じ山札」とは限らない。ここでは意図的に
+    // 同じ URL を返させ、世代トークンでのみ判別できることを確かめる。
+    test('先頭 URL が同じでも入れ替わった山札への遅延スワイプは無視される', () async {
+      final api = DeferredApiService();
+      final container = createContainer(api);
+      final notifier = container.read(animalImagesProvider.notifier);
+
+      final initial = container.read(animalImagesProvider.future);
+      api.completeFirstWith(['cat', 'dog']);
+      await initial;
+      // カード表示時点の世代を控える（画面がコールバックに持たせる値）
+      final oldDeckToken = notifier.deckGeneration;
+
+      // 再取得して山札を入れ替える。ただし先頭の画像は前回と同一 URL
+      final reloading = notifier.reload();
+      api.completeFirstWith(['cat', 'dog']);
+      await reloading;
+
+      final newDeck = container.read(animalImagesProvider).requireValue;
+      expect(
+        newDeck.first.url,
+        'http://example.com/cat-1.jpg',
+        reason: '新旧で先頭 URL が一致する状況を作っていること',
+      );
+
+      // ここで「古いカードのスワイプ完了」が遅れて届く
+      final removed = notifier.removeTopImage(deckToken: oldDeckToken);
+
+      expect(removed, isFalse, reason: 'URL は同じでも世代が違うので無視される');
+      expect(
+        container.read(animalImagesProvider).requireValue,
+        newDeck,
+        reason: '新しい山札が削られていないこと',
+      );
+
+      // 現在の世代での操作は通る
+      expect(
+        notifier.removeTopImage(deckToken: notifier.deckGeneration),
+        isTrue,
+      );
+    });
+
+    // invalidate すると Notifier ごと作り直されるため、インスタンス内の
+    // カウンタでトークンを採番すると新旧で同じ値が再利用され、古い操作が
+    // 新しい山札を通過してしまう。採番元がプロセス全体で単調増加すること。
+    test('invalidate で Notifier が作り直されても山札トークンが再利用されない', () async {
+      final container = createContainer(FakeApiService());
+
+      await container.read(animalImagesProvider.future);
+      final oldToken = container
+          .read(animalImagesProvider.notifier)
+          .deckGeneration;
+
+      // StartScreen の「はじめる」相当。Notifier ごと作り直される
+      container.invalidate(animalImagesProvider);
+      await container.read(animalImagesProvider.future);
+      final newNotifier = container.read(animalImagesProvider.notifier);
+
+      expect(
+        newNotifier.deckGeneration,
+        greaterThan(oldToken),
+        reason: '作り直し後のトークンは以前の値より必ず大きいこと',
+      );
+      expect(
+        newNotifier.removeTopImage(deckToken: oldToken),
+        isFalse,
+        reason: '古い山札のトークンでは新しい山札を削れないこと',
+      );
     });
 
     test('エラー時に Riverpod の自動リトライが走らない', () async {

@@ -45,21 +45,39 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
       );
   }
 
-  void _skip() {
-    ref.read(animalImagesProvider.notifier).removeTopImage();
+  /// 再取得中は退場アニメーション中の古いカードが残っているため、
+  /// そのカードへのスワイプ／タップを受け付けない
+  bool get _isRefreshing => ref.read(animalImagesProvider).isLoading;
+
+  /// [deckToken] はカードを表示した時点の山札世代。スワイプ完了は 250ms 遅れて
+  /// 通知されるため、その間に山札が入れ替わっていないかを Notifier に照合させる。
+  void _skip(int deckToken) {
+    if (_isRefreshing) return;
+    ref
+        .read(animalImagesProvider.notifier)
+        .removeTopImage(deckToken: deckToken);
   }
 
-  void _like() {
-    _showLikedMessage();
-    ref.read(animalImagesProvider.notifier).removeTopImage();
+  void _like(int deckToken) {
+    if (_isRefreshing) return;
+    final removed = ref
+        .read(animalImagesProvider.notifier)
+        .removeTopImage(deckToken: deckToken);
+    // 古い操作で山札が変化しなかった場合は「好き」の通知も出さない
+    if (removed) _showLikedMessage();
   }
 
   @override
   Widget build(BuildContext context) {
     final imagesAsync = ref.watch(animalImagesProvider);
-    // 追加読み込み中でも手元の画像は操作できるようにするため、
-    // ローディング状態ではなく「表示できる画像があるか」でボタンを制御する
-    final hasImage = imagesAsync.value?.isNotEmpty ?? false;
+    // 再取得中は前回の値が AsyncLoading に保持されたままになる。
+    // 画面はローディング表示なのにボタンだけ効いてしまわないよう、
+    // 「いま表示中のカードがあるか」＝ 読み込み中でないこと も条件に含める。
+    // 操作対象のカードがなければボタンは無効。
+    final hasImage =
+        !imagesAsync.isLoading && (imagesAsync.value?.isNotEmpty ?? false);
+    // 表示中の山札の世代。カード操作にこれを持ち回らせる
+    final deckToken = ref.read(animalImagesProvider.notifier).deckGeneration;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -137,11 +155,12 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                       skipLoadingOnRefresh: false,
                       data: (images) {
                         if (images.isEmpty) return const _LoadingState();
+                        final top = images.first;
                         return SwipeCard(
-                          key: ValueKey(images.first.url),
-                          image: images.first,
-                          onSwipeLeft: _skip,
-                          onSwipeRight: _like,
+                          key: ValueKey(top.url),
+                          image: top,
+                          onSwipeLeft: () => _skip(deckToken),
+                          onSwipeRight: () => _like(deckToken),
                         );
                       },
                       loading: () => const _LoadingState(),
@@ -159,14 +178,14 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ActionButton(
-                      onPressed: hasImage ? _skip : null,
+                      onPressed: hasImage ? () => _skip(deckToken) : null,
                       icon: Icons.close,
                       backgroundColor: context.colors.error,
                       label: AppStrings.skip,
                     ),
                     const SizedBox(width: 44),
                     ActionButton(
-                      onPressed: hasImage ? _like : null,
+                      onPressed: hasImage ? () => _like(deckToken) : null,
                       icon: Icons.favorite,
                       backgroundColor: context.colors.secondary,
                       label: AppStrings.like,
