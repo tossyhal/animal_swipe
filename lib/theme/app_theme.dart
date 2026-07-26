@@ -30,8 +30,8 @@ class AppTheme {
   }
 
   /// 共通のCardTheme設定
-  static CardTheme _buildCardTheme({Color? cardColor}) {
-    return CardTheme(
+  static CardThemeData _buildCardTheme({Color? cardColor}) {
+    return CardThemeData(
       elevation: AppConstants.elevationMedium,
       color: cardColor,
       shape: RoundedRectangleBorder(

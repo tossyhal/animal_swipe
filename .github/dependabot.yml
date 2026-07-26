@@ -1,0 +1,32 @@
+version: 2
+
+updates:
+  # Dart / Flutter の依存パッケージ
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      # パッチ・マイナーはまとめて1PRにし、レビュー負荷を下げる
+      dart-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions のバージョン固定を追随させる
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(ci)'
