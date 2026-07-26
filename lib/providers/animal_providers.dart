@@ -47,6 +47,20 @@ class SelectedAnimalTypesNotifier extends Notifier<List<String>> {
 /// 読み込み中・エラー・データの 3 状態を [AsyncValue] 1 つで表現する。
 /// 以前は loading / error を別々の `StateProvider` に手動同期していたが、
 /// 状態が分散して整合性が壊れやすいため廃止した。
+///
+/// ## 選択タイプが変わったときの挙動: **意図的にリセットして取り直す**
+///
+/// [build] が [selectedAnimalTypesProvider] を watch しているため、
+/// 選択が変わると山札は破棄され、新しい選択で取得し直される。
+/// これは意図した仕様であり、副作用ではない。
+///
+/// 「いぬ」の選択を外したのに、既に取得済みのいぬの画像が残り続けるのは
+/// ユーザーの意図に反する。フィルタを外した瞬間に反映されるべきなので、
+/// 維持ではなくリセットを選んでいる。
+///
+/// スワイプ画面に種類フィルタを足す場合も、この挙動でそのまま動く。
+/// なお現状の StartScreen でのトグルは、スワイプ画面が居らず
+/// このプロバイダーが autoDispose されているため取得を発生させない。
 final animalImagesProvider =
     AsyncNotifierProvider<AnimalImagesNotifier, List<AnimalImage>>(
       AnimalImagesNotifier.new,
@@ -95,6 +109,8 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
   @override
   Future<List<AnimalImage>> build() async {
     final apiService = ref.watch(apiServiceProvider);
+    // watch なので選択が変われば山札を破棄して取り直す（意図した仕様）。
+    // 詳細は animalImagesProvider のドキュメントコメントを参照。
     final selectedTypes = ref.watch(selectedAnimalTypesProvider);
 
     // 選択が変わって build() が再実行されたら、進行中の追加読み込みは

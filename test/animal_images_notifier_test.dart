@@ -279,6 +279,73 @@ void main() {
       );
     });
 
+    // 選択変更時に「維持」ではなく「リセットして取り直す」ことを仕様として固定する。
+    // 外したはずの動物が残り続けるのはユーザーの意図に反するため。
+    group('選択タイプが変わったときの挙動（意図的なリセット）', () {
+      test('選択から外した動物の画像は残らない', () async {
+        final api = FakeApiService();
+        final container = createContainer(api);
+
+        final before = await container.read(animalImagesProvider.future);
+        expect(before.map((i) => i.type), containsAll(['cat', 'dog']));
+
+        container
+            .read(selectedAnimalTypesProvider.notifier)
+            .selectType('dog', false);
+
+        final after = await container.read(animalImagesProvider.future);
+        expect(
+          after.map((i) => i.type),
+          everyElement('cat'),
+          reason: '外した dog の画像は残らないこと',
+        );
+        expect(api.lastRequestedTypes, ['cat'], reason: '新しい選択で取得し直すこと');
+      });
+
+      test('選択を追加した場合も取得し直す', () async {
+        SharedPreferences.setMockInitialValues({
+          'selected_animal_types': ['cat'],
+        });
+        prefsService = PrefsService(await SharedPreferences.getInstance());
+
+        final api = FakeApiService();
+        final container = createContainer(api);
+
+        expect((await container.read(animalImagesProvider.future)).length, 1);
+
+        container
+            .read(selectedAnimalTypesProvider.notifier)
+            .selectType('dog', true);
+
+        final after = await container.read(animalImagesProvider.future);
+        expect(after.map((i) => i.type), ['cat', 'dog']);
+      });
+
+      test('スワイプ画面が居ない間のトグルは取得を発生させない', () async {
+        final api = FakeApiService();
+        // ここでは animalImagesProvider を購読しない（＝スワイプ画面が居ない状況）
+        final container = ProviderContainer(
+          overrides: [
+            prefsServiceProvider.overrideWithValue(prefsService),
+            apiServiceProvider.overrideWithValue(api),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final notifier = container.read(selectedAnimalTypesProvider.notifier);
+        notifier.selectType('dog', false);
+        notifier.selectType('dog', true);
+        notifier.selectType('cat', false);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(
+          api.callCount,
+          0,
+          reason: 'StartScreen でのトグルは無駄な通信を発生させないこと',
+        );
+      });
+    });
+
     test('エラー時に Riverpod の自動リトライが走らない', () async {
       final api = _CountingFailingApiService();
       final container = createContainer(api);
