@@ -55,23 +55,16 @@ class AppTheme {
 
   /// 共通のTextTheme設定
   ///
-  /// 色は指定しない。`ThemeData` が `colorScheme.onSurface` を基準に
-  /// 自動で解決するため、テーマごとに色を渡す必要はない。
+  /// 色も書体も指定しない。色は `ThemeData` が `colorScheme.onSurface` から、
+  /// 書体は `ThemeData(fontFamily: ...)` が全ロールに一括で適用する。
   static TextTheme _buildTextTheme() {
     return const TextTheme(
       titleLarge: TextStyle(
-        fontFamily: AppStrings.fontFamily,
         fontWeight: FontWeight.bold,
         fontSize: AppConstants.fontSizeXXLarge,
       ),
-      bodyLarge: TextStyle(
-        fontFamily: AppStrings.fontFamily,
-        fontSize: AppConstants.fontSizeMedium,
-      ),
-      bodyMedium: TextStyle(
-        fontFamily: AppStrings.fontFamily,
-        fontSize: AppConstants.fontSizeSmall,
-      ),
+      bodyLarge: TextStyle(fontSize: AppConstants.fontSizeMedium),
+      bodyMedium: TextStyle(fontSize: AppConstants.fontSizeSmall),
     );
   }
 
@@ -105,16 +98,19 @@ class AppTheme {
   }
 
   /// 共通のAppBarTheme設定
-  static AppBarTheme _buildAppBarTheme(ColorScheme colorScheme) {
+  ///
+  /// `titleTextStyle` は `TextStyle` を直接組み立てず、
+  /// `fontFamily` 適用済みの `textTheme.titleLarge` から派生させる。
+  /// ここで新しい `TextStyle` を作ると `ThemeData(fontFamily: ...)` が
+  /// 効かず、AppBar のタイトルだけ既定フォントに落ちてしまうため。
+  static AppBarTheme _buildAppBarTheme(ThemeData base) {
+    final colorScheme = base.colorScheme;
     return AppBarTheme(
       elevation: 0,
       backgroundColor: colorScheme.primary,
       foregroundColor: colorScheme.onPrimary,
       centerTitle: true,
-      titleTextStyle: TextStyle(
-        fontFamily: AppStrings.fontFamily,
-        fontWeight: FontWeight.bold,
-        fontSize: AppConstants.fontSizeXXLarge,
+      titleTextStyle: base.textTheme.titleLarge?.copyWith(
         color: colorScheme.onPrimary,
       ),
     );
@@ -122,15 +118,17 @@ class AppTheme {
 
   static ThemeData _buildTheme(Brightness brightness) {
     final colorScheme = buildColorScheme(brightness);
-    return ThemeData(
+    final base = ThemeData(
       colorScheme: colorScheme,
+      // 書体はここで一括指定する。個々の TextStyle には書かない
+      fontFamily: AppStrings.fontFamily,
       textTheme: _buildTextTheme(),
       cardTheme: _buildCardTheme(),
       elevatedButtonTheme: _buildElevatedButtonTheme(colorScheme),
-      appBarTheme: _buildAppBarTheme(colorScheme),
       useMaterial3: true,
       visualDensity: VisualDensity.standard,
     );
+    return base.copyWith(appBarTheme: _buildAppBarTheme(base));
   }
 
   /// ライトテーマ

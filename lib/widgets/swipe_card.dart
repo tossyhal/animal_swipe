@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
+import '../constants/app_strings.dart';
 import '../models/animal_model.dart';
 import '../theme/theme_extensions.dart';
 
@@ -189,7 +190,9 @@ class _SwipeCardState extends State<SwipeCard>
                             fit: StackFit.expand,
                             children: [
                               Hero(
-                                tag: 'animal_image_${widget.image.id}',
+                                tag:
+                                    '${AppStrings.animalImageHeroTagPrefix}'
+                                    '${widget.image.id}',
                                 child: Image.network(
                                   widget.image.url,
                                   fit: BoxFit.cover,
@@ -231,9 +234,8 @@ class _SwipeCardState extends State<SwipeCard>
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
-                                            '画像の読み込みに失敗しました',
+                                            AppStrings.imageLoadError,
                                             style: TextStyle(
-                                              fontFamily: 'MPLUSRounded1c',
                                               color: colors.error,
                                             ),
                                           ),
@@ -301,7 +303,6 @@ class _SwipeCardState extends State<SwipeCard>
                                   widget.image.description!,
                                   style: TextStyle(
                                     fontSize: 18,
-                                    fontFamily: 'MPLUSRounded1c',
                                     fontWeight: FontWeight.bold,
                                     color: colors.onSurface,
                                   ),
@@ -322,7 +323,6 @@ class _SwipeCardState extends State<SwipeCard>
                                       widget.image.type.toUpperCase(),
                                       style: TextStyle(
                                         fontSize: 14,
-                                        fontFamily: 'MPLUSRounded1c',
                                         fontWeight: FontWeight.w500,
                                         color: colors.onPrimaryContainer,
                                       ),

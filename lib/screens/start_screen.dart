@@ -98,7 +98,6 @@ class StartScreen extends ConsumerWidget {
                               AppStrings.swipeHint,
                               style: TextStyle(
                                 color: onGradientMuted,
-                                fontFamily: AppStrings.fontFamily,
                                 fontSize: 13,
                               ),
                             ),
@@ -144,7 +143,6 @@ class _BrandHeader extends StatelessWidget {
           style: TextStyle(
             height: 1,
             fontSize: 42,
-            fontFamily: AppStrings.fontFamily,
             fontWeight: FontWeight.bold,
             letterSpacing: -1.5,
             color: onGradient,
@@ -154,11 +152,7 @@ class _BrandHeader extends StatelessWidget {
         Text(
           AppStrings.tagline,
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: onGradient,
-            fontFamily: AppStrings.fontFamily,
-            fontSize: 15,
-          ),
+          style: TextStyle(color: onGradient, fontSize: 15),
         ),
       ],
     );
@@ -196,11 +190,7 @@ class _SelectionPanel extends StatelessWidget {
           children: [
             const Text(
               AppStrings.selectAnimalPrompt,
-              style: TextStyle(
-                fontFamily: AppStrings.fontFamily,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
@@ -250,7 +240,6 @@ class _SelectionPanel extends StatelessWidget {
                     Text(
                       AppStrings.startButton,
                       style: TextStyle(
-                        fontFamily: AppStrings.fontFamily,
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
@@ -320,7 +309,6 @@ class _AnimalChoice extends StatelessWidget {
                       Text(
                         name,
                         style: const TextStyle(
-                          fontFamily: AppStrings.fontFamily,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -331,7 +319,6 @@ class _AnimalChoice extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontFamily: AppStrings.fontFamily,
                           fontSize: 10,
                           color: context.colors.onSurfaceVariant,
                         ),

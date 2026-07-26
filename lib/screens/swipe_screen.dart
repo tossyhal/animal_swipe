@@ -32,13 +32,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
             children: [
               Icon(Icons.favorite, color: onSnackBar, size: 20),
               const SizedBox(width: 10),
-              Text(
-                AppStrings.liked,
-                style: TextStyle(
-                  fontFamily: AppStrings.fontFamily,
-                  color: onSnackBar,
-                ),
-              ),
+              Text(AppStrings.liked, style: TextStyle(color: onSnackBar)),
             ],
           ),
           backgroundColor: context.colors.secondary,
@@ -100,11 +94,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
             SizedBox(width: 8),
             Text(
               AppStrings.appName,
-              style: TextStyle(
-                fontFamily: AppStrings.fontFamily,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -116,10 +106,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
               icon: const Icon(Icons.home, size: 19),
               label: const Text(
                 AppStrings.homeButton,
-                style: TextStyle(
-                  fontFamily: AppStrings.fontFamily,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
               onPressed: () {
                 Navigator.of(context).pushReplacement(
@@ -141,7 +128,6 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                   AppStrings.discoverTitle,
                   style: TextStyle(
                     color: onGradient,
-                    fontFamily: AppStrings.fontFamily,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -151,7 +137,6 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                   AppStrings.discoverSubtitle,
                   style: TextStyle(
                     color: onGradient.withValues(alpha: 0.7),
-                    fontFamily: AppStrings.fontFamily,
                     fontSize: 13,
                   ),
                 ),
@@ -231,11 +216,7 @@ class _LoadingState extends StatelessWidget {
           Text(
             AppStrings.loading,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: onGradient,
-              fontFamily: AppStrings.fontFamily,
-              fontSize: 15,
-            ),
+            style: TextStyle(color: onGradient, fontSize: 15),
           ),
         ],
       ),
@@ -270,11 +251,7 @@ class _LoadError extends StatelessWidget {
               const Text(
                 AppStrings.loadErrorTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: AppStrings.fontFamily,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               const SizedBox(height: 8),
               Text(

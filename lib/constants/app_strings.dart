@@ -32,6 +32,12 @@ class AppStrings {
   static const String skip = '次へ';
   static const String like = '好き';
 
+  // Swipe Card
+  static const String imageLoadError = '画像の読み込みに失敗しました';
+
+  /// Hero アニメーションのタグ接頭辞（画像 ID を連結して使う）
+  static const String animalImageHeroTagPrefix = 'animal_image_';
+
   // Snackbar Messages
   static const String liked = '「好き」を送りました';
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:animal_swipe/constants/app_colors.dart';
+import 'package:animal_swipe/constants/app_strings.dart';
 import 'package:animal_swipe/models/animal_model.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
@@ -150,6 +151,66 @@ void main() {
           reason: 'outlineVariant は控えめな境界線なので surface と近いトーンであるべき',
         );
       }
+    });
+  });
+
+  group('fontFamily がテーマから一括で適用されること', () {
+    test('ThemeData.textTheme の全ロールに fontFamily が入っていること', () {
+      for (final entry in {'light': light, 'dark': dark}.entries) {
+        final textTheme = entry.value.textTheme;
+        final styles = <String, TextStyle?>{
+          'displayLarge': textTheme.displayLarge,
+          'titleLarge': textTheme.titleLarge,
+          'titleMedium': textTheme.titleMedium,
+          'bodyLarge': textTheme.bodyLarge,
+          'bodyMedium': textTheme.bodyMedium,
+          'bodySmall': textTheme.bodySmall,
+          'labelLarge': textTheme.labelLarge,
+        };
+        styles.forEach((name, style) {
+          expect(
+            style?.fontFamily,
+            AppStrings.fontFamily,
+            reason: '${entry.key}: $name に fontFamily が適用されていない',
+          );
+        });
+      }
+    });
+
+    test('AppBar のタイトルにも fontFamily が効いていること', () {
+      for (final entry in {'light': light, 'dark': dark}.entries) {
+        expect(
+          entry.value.appBarTheme.titleTextStyle?.fontFamily,
+          AppStrings.fontFamily,
+          reason: '${entry.key}: AppBar のタイトルだけ既定フォントに落ちている',
+        );
+      }
+    });
+
+    testWidgets('画面上の Text が実際に fontFamily を解決できること', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final container = ProviderContainer(
+        overrides: [
+          prefsServiceProvider.overrideWithValue(PrefsService(prefs)),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(theme: light, home: const StartScreen()),
+        ),
+      );
+
+      // 個別 TextStyle から fontFamily を消しても、
+      // DefaultTextStyle 経由でテーマの書体が解決される
+      final appName = tester.widget<Text>(find.text(AppStrings.appName));
+      final resolved = DefaultTextStyle.of(
+        tester.element(find.text(AppStrings.appName)),
+      ).style.merge(appName.style);
+      expect(resolved.fontFamily, AppStrings.fontFamily);
     });
   });
 
