@@ -1,4 +1,4 @@
-package com.example.animal_swipe
+package dev.tossyhal.animalswipe
 
 import io.flutter.embedding.android.FlutterActivity
 
