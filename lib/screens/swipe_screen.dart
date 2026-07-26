@@ -17,13 +17,8 @@ class SwipeScreen extends ConsumerStatefulWidget {
 }
 
 class _SwipeScreenState extends ConsumerState<SwipeScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(animalImagesProvider.notifier).loadInitialImages();
-    });
-  }
+  // AsyncNotifier の build() が初回 watch 時に走るため、
+  // 画面側から明示的に初期読み込みを呼ぶ必要はない。
 
   void _showLikedMessage() {
     ScaffoldMessenger.of(context)
@@ -61,10 +56,10 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final images = ref.watch(animalImagesProvider);
-    final isLoading = ref.watch(animalImagesLoadingProvider);
-    final errorMessage = ref.watch(animalImagesErrorProvider);
-    final hasImage = images.isNotEmpty;
+    final imagesAsync = ref.watch(animalImagesProvider);
+    // 追加読み込み中でも手元の画像は操作できるようにするため、
+    // ローディング状態ではなく「表示できる画像があるか」でボタンを制御する
+    final hasImage = imagesAsync.value?.isNotEmpty ?? false;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -138,23 +133,25 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
-                    child:
-                        hasImage
-                            ? SwipeCard(
-                              key: ValueKey(images.first.url),
-                              image: images.first,
-                              onSwipeLeft: _skip,
-                              onSwipeRight: _like,
-                            )
-                            : errorMessage != null && !isLoading
-                            ? _LoadError(
-                              onRetry: () {
-                                ref
-                                    .read(animalImagesProvider.notifier)
-                                    .loadInitialImages();
-                              },
-                            )
-                            : const _LoadingState(),
+                    child: imagesAsync.when(
+                      skipLoadingOnRefresh: false,
+                      data: (images) {
+                        if (images.isEmpty) return const _LoadingState();
+                        return SwipeCard(
+                          key: ValueKey(images.first.url),
+                          image: images.first,
+                          onSwipeLeft: _skip,
+                          onSwipeRight: _like,
+                        );
+                      },
+                      loading: () => const _LoadingState(),
+                      error:
+                          (error, stackTrace) => _LoadError(
+                            onRetry: () {
+                              ref.read(animalImagesProvider.notifier).reload();
+                            },
+                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 18),

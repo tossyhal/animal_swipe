@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animal_swipe/screens/swipe_screen.dart';
 import 'package:animal_swipe/models/animal_model.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
-import 'package:animal_swipe/services/api_service.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
 import 'package:animal_swipe/widgets/swipe_card.dart';
@@ -39,67 +38,59 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   /// 実装側の [build] は apiServiceProvider / selectedAnimalTypesProvider を
   /// watch するが、Fake では外部依存を持たず初期リストをそのまま返す
   @override
-  List<AnimalImage> build() => _initialImages;
+  Future<List<AnimalImage>> build() async {
+    if (_shouldSimulateError) throw Exception('Failed to load images');
+    return _initialImages;
+  }
 
   @override
-  Future<void> loadInitialImages() async {
+  Future<void> reload() async {
     if (_shouldSimulateError) {
-      state = [];
-      throw Exception('Failed to load images');
+      state = AsyncValue.error(
+        Exception('Failed to load images'),
+        StackTrace.current,
+      );
+      return;
     }
-
-    state = _initialImages;
+    state = AsyncValue.data(_initialImages);
   }
 
   @override
   void removeTopImage() {
-    if (state.isNotEmpty) {
-      state = state.sublist(1);
-      // 画像の残りが閾値未満の場合、追加画像を読み込む
-      if (state.length < 3) {
-        _loadMoreCallCount++; // カウンターをインクリメント
-        state = [
-          ...state,
-          AnimalImage(
-            id: 'additional_$_loadMoreCallCount',
-            url: 'http://example.com/additional_$_loadMoreCallCount.jpg',
-            type: _loadMoreCallCount % 2 == 0 ? 'cat' : 'dog',
-          ),
-        ];
-      }
+    final current = state.value ?? const <AnimalImage>[];
+    if (current.isEmpty) return;
+
+    final rest = current.sublist(1);
+    // 画像の残りが閾値未満の場合、追加画像を読み込む
+    if (rest.length < 3) {
+      _loadMoreCallCount++; // カウンターをインクリメント
+      state = AsyncValue.data([...rest, _additionalImage()]);
+    } else {
+      state = AsyncValue.data(rest);
     }
   }
 
   @override
   Future<void> loadMoreImages() async {
-    if (_shouldSimulateError) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      throw Exception('Failed to load more images');
-    }
     await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (_shouldSimulateError) throw Exception('Failed to load more images');
+
     _loadMoreCallCount++;
-    state = [
-      ...state,
-      AnimalImage(
-        id: 'additional_$_loadMoreCallCount',
-        url: 'http://example.com/additional_$_loadMoreCallCount.jpg',
-        type: _loadMoreCallCount % 2 == 0 ? 'cat' : 'dog',
-      ),
-    ];
+    final current = state.value ?? const <AnimalImage>[];
+    state = AsyncValue.data([...current, _additionalImage()]);
   }
+
+  AnimalImage _additionalImage() => AnimalImage(
+    id: 'additional_$_loadMoreCallCount',
+    url: 'http://example.com/additional_$_loadMoreCallCount.jpg',
+    type: _loadMoreCallCount % 2 == 0 ? 'cat' : 'dog',
+  );
 
   void setSimulateError(bool shouldError) {
     _shouldSimulateError = shouldError;
   }
 
   int get loadMoreCallCount => _loadMoreCallCount;
-}
-
-class FakeApiService implements IApiService {
-  @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) async {
-    return [];
-  }
 }
 
 void main() {
