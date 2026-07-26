@@ -39,8 +39,9 @@ class AnimalSwipeApp extends ConsumerWidget {
     // 前回の選択が残っていれば、選び直しを挟まずスワイプ画面から始める。
     // 起動のたびに同じ選択をやり直させる必要はない。
     // 選択を変えたい場合はスワイプ画面の「選び直す」から戻れる。
-    final hasSelection =
-        ref.watch(prefsServiceProvider).hasSelectedAnimalTypes();
+    final hasSelection = ref
+        .watch(prefsServiceProvider)
+        .hasSelectedAnimalTypes();
 
     return MaterialApp(
       title: AppStrings.appTitle,

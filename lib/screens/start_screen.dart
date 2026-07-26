@@ -35,8 +35,9 @@ class StartScreen extends ConsumerWidget {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final horizontalPadding =
-                  constraints.maxWidth < 420 ? 20.0 : 32.0;
+              final horizontalPadding = constraints.maxWidth < 420
+                  ? 20.0
+                  : 32.0;
 
               return SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
@@ -61,27 +62,24 @@ class StartScreen extends ConsumerWidget {
                               .read(selectedAnimalTypesProvider.notifier)
                               .selectType(type, isSelected);
                         },
-                        onStart:
-                            selectedTypes.isEmpty
-                                ? null
-                                : () {
-                                  ref
-                                      .read(
-                                        selectedAnimalTypesProvider.notifier,
-                                      )
-                                      .saveSelectedTypes();
-                                  // 新しいセッションの開始として山札を必ず取り直す。
-                                  // pushReplacement の遷移中は旧 SwipeScreen と
-                                  // 新 SwipeScreen が重なり購読者が 0 にならないため、
-                                  // autoDispose だけに頼ると山札が尽きたまま
-                                  // 再開されてしまう
-                                  ref.invalidate(animalImagesProvider);
-                                  Navigator.of(context).pushReplacement(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const SwipeScreen(),
-                                    ),
-                                  );
-                                },
+                        onStart: selectedTypes.isEmpty
+                            ? null
+                            : () {
+                                ref
+                                    .read(selectedAnimalTypesProvider.notifier)
+                                    .saveSelectedTypes();
+                                // 新しいセッションの開始として山札を必ず取り直す。
+                                // pushReplacement の遷移中は旧 SwipeScreen と
+                                // 新 SwipeScreen が重なり購読者が 0 にならないため、
+                                // autoDispose だけに頼ると山札が尽きたまま
+                                // 再開されてしまう
+                                ref.invalidate(animalImagesProvider);
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const SwipeScreen(),
+                                  ),
+                                );
+                              },
                       ),
                       const Padding(
                         padding: EdgeInsets.only(top: 28),
@@ -295,16 +293,14 @@ class _AnimalChoice extends StatelessWidget {
             duration: const Duration(milliseconds: 220),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color:
-                  isSelected
-                      ? context.colors.primaryContainer
-                      : context.colors.surfaceContainerLowest,
+              color: isSelected
+                  ? context.colors.primaryContainer
+                  : context.colors.surfaceContainerLowest,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color:
-                    isSelected
-                        ? context.colors.primary
-                        : context.colors.outlineVariant,
+                color: isSelected
+                    ? context.colors.primary
+                    : context.colors.outlineVariant,
                 width: isSelected ? 2 : 1,
               ),
             ),

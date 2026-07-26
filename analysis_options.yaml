@@ -21,8 +21,16 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # 不要な再ビルドを避けるため const コンストラクタを強制する。
+    prefer_const_constructors: true
+    # 戻り値の型を明示させ、暗黙の dynamic を防ぐ。
+    always_declare_return_types: true
+    # 差分を安定させ、フォーマッタの整形結果を予測しやすくする。
+    require_trailing_commas: true
+    # 本番コードに print が残るのを防ぐ（ログは logger 経由に統一する）。
+    avoid_print: true
+    # await / unawaited() の付け忘れによる例外の握り潰しを防ぐ。
+    unawaited_futures: true
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

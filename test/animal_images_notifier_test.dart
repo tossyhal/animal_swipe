@@ -63,9 +63,9 @@ class DeferredApiService implements IApiService {
 
   /// 保留中の最初のリクエストに、指定タイプの画像を1件ずつ返す
   void completeFirstWith(List<String> types, {int seq = 1}) {
-    _pending.removeAt(0).complete(
-      types.map((type) => _image(type, seq)).toList(),
-    );
+    _pending
+        .removeAt(0)
+        .complete(types.map((type) => _image(type, seq)).toList());
   }
 }
 
@@ -118,7 +118,9 @@ void main() {
       await container.read(animalImagesProvider.future);
 
       final notifier = container.read(animalImagesProvider.notifier);
-      final initialLength = container.read(animalImagesProvider).requireValue
+      final initialLength = container
+          .read(animalImagesProvider)
+          .requireValue
           .length;
 
       notifier.removeTopImage();
@@ -163,7 +165,9 @@ void main() {
     test('reload() でエラー状態から復帰できる', () async {
       // 1回目は失敗、2回目は成功する ApiService
       var shouldFail = true;
-      final container = createContainer(_SwitchableApiService(() => shouldFail));
+      final container = createContainer(
+        _SwitchableApiService(() => shouldFail),
+      );
 
       expect((await awaitError(container)).hasError, isTrue);
 
@@ -338,11 +342,7 @@ void main() {
         notifier.selectType('cat', false);
         await Future<void>.delayed(Duration.zero);
 
-        expect(
-          api.callCount,
-          0,
-          reason: 'StartScreen でのトグルは無駄な通信を発生させないこと',
-        );
+        expect(api.callCount, 0, reason: 'StartScreen でのトグルは無駄な通信を発生させないこと');
       });
     });
 
@@ -388,7 +388,8 @@ void main() {
       expect((await initial).length, 2);
 
       // 追加読み込みを開始（まだ応答は返さない）
-      final more = container.read(animalImagesProvider.notifier)
+      final more = container
+          .read(animalImagesProvider.notifier)
           .loadMoreImages();
       expect(api.pendingCount, 1);
 

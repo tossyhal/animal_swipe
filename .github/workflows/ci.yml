@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# 同一 PR / 同一ブランチで新しい push があったら古い実行を打ち切る。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# 既定は読み取りのみ。書き込みが要るジョブだけ個別に権限を足す。
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.44.8
+
+jobs:
+  format:
+    name: フォーマット確認
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Get Flutter dependencies
+        run: flutter pub get
+      # 現行の Flutter に `flutter format` は存在しない（`dart format` に統合済み）。
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+  analyze:
+    name: 静的解析
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Get Flutter dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+  test:
+    name: テスト
+    runs-on: ubuntu-latest
+    needs: [format, analyze]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Get Flutter dependencies
+        run: flutter pub get
+      - name: Run tests
+        run: flutter test
+
+  preview:
+    name: PR プレビューへデプロイ
+    runs-on: ubuntu-latest
+    needs: [test]
+    # `pull_request` イベントでは Fork からの PR にシークレットが渡らないため、
+    # 同一リポジトリからの PR に限定する。Fork PR にシークレットを渡すために
+    # `pull_request_target` を使うのは、PR のコードを特権コンテキストで実行する
+    # ことになり危険なので採用しない（Fork PR ではこのジョブは単にスキップされる）。
+    #
+    # Dependabot の PR はブランチが同一リポジトリにあるため上記条件を満たすが、
+    # GitHub は Dependabot 起動のワークフローを Fork 相当に扱い、
+    # リポジトリのシークレットを渡さず GITHUB_TOKEN も読み取り専用にする。
+    # 除外しないと、Dependabot の PR が毎回このジョブで失敗する。
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    permissions:
+      contents: read
+      # action-hosting-deploy がプレビュー URL を PR にコメントするために必要。
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Get Flutter dependencies
+        run: flutter pub get
+      - name: Build web
+        run: flutter build web --release
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ANIMAL_SWIPE_596CC }}
+          projectId: animal-swipe-596cc
+          expires: 7d

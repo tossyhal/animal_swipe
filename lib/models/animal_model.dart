@@ -43,10 +43,9 @@ class AnimalImage {
         id: json['id'] as String? ?? url,
         url: url,
         type: 'dog',
-        description:
-            json['breeds']?.isNotEmpty == true
-                ? json['breeds'][0]['name']
-                : null,
+        description: json['breeds']?.isNotEmpty == true
+            ? json['breeds'][0]['name']
+            : null,
         source: 'The Dog API',
       );
     } else {

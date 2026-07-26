@@ -164,12 +164,11 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                         );
                       },
                       loading: () => const _LoadingState(),
-                      error:
-                          (error, stackTrace) => _LoadError(
-                            onRetry: () {
-                              ref.read(animalImagesProvider.notifier).reload();
-                            },
-                          ),
+                      error: (error, stackTrace) => _LoadError(
+                        onRetry: () {
+                          ref.read(animalImagesProvider.notifier).reload();
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -206,11 +205,11 @@ class _LoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 42,
             height: 42,
             child: CircularProgressIndicator(
@@ -218,8 +217,8 @@ class _LoadingState extends StatelessWidget {
               strokeWidth: 3,
             ),
           ),
-          const SizedBox(height: 18),
-          const Text(
+          SizedBox(height: 18),
+          Text(
             AppStrings.loading,
             textAlign: TextAlign.center,
             style: TextStyle(

@@ -95,7 +95,6 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
     _shouldSimulateError = shouldError;
   }
 
-
   int get loadMoreCallCount => _loadMoreCallCount;
 }
 
@@ -397,11 +396,7 @@ void main() {
         await tester.pump();
 
         // ボタンの無効化はフレーム単位で即座に反映される
-        expect(
-          skipButton().onTap,
-          isNull,
-          reason: '再取得中に古い山札へ操作できてはいけない',
-        );
+        expect(skipButton().onTap, isNull, reason: '再取得中に古い山札へ操作できてはいけない');
 
         // AnimatedSwitcher が退場中のカードを保持している間にスワイプしても、
         // 古い山札で state を上書きしてはいけない

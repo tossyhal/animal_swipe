@@ -106,8 +106,9 @@ class _SwipeCardState extends State<SwipeCard>
 
     if (_dragOffset.dx.abs() > threshold || isFastHorizontalFlick) {
       // 横方向のスワイプが閾値を超えた場合
-      final swipedRight =
-          _dragOffset.dx == 0 ? horizontalVelocity > 0 : _dragOffset.dx > 0;
+      final swipedRight = _dragOffset.dx == 0
+          ? horizontalVelocity > 0
+          : _dragOffset.dx > 0;
       if (swipedRight) {
         // 右スワイプの場合
         _animateCardOut(screenWidth * 1.5, 0, widget.onSwipeRight);
@@ -192,32 +193,31 @@ class _SwipeCardState extends State<SwipeCard>
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   height: double.infinity,
-                                  loadingBuilder: (
-                                    context,
-                                    child,
-                                    loadingProgress,
-                                  ) {
-                                    if (loadingProgress == null) return child;
-                                    return Center(
-                                      child: CircularProgressIndicator(
-                                        value:
-                                            loadingProgress
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
+                                        if (loadingProgress == null) {
+                                          return child;
+                                        }
+                                        return Center(
+                                          child: CircularProgressIndicator(
+                                            value:
+                                                loadingProgress
                                                         .expectedTotalBytes !=
                                                     null
                                                 ? loadingProgress
-                                                        .cumulativeBytesLoaded /
-                                                    loadingProgress
-                                                        .expectedTotalBytes!
+                                                          .cumulativeBytesLoaded /
+                                                      loadingProgress
+                                                          .expectedTotalBytes!
                                                 : null,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                            ),
-                                      ),
-                                    );
-                                  },
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                ),
+                                          ),
+                                        );
+                                      },
                                   errorBuilder: (context, error, stackTrace) {
                                     return Center(
                                       child: Column(
@@ -227,20 +227,18 @@ class _SwipeCardState extends State<SwipeCard>
                                           Icon(
                                             Icons.error_outline,
                                             size: 48,
-                                            color:
-                                                Theme.of(
-                                                  context,
-                                                ).colorScheme.error,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
                                             '画像の読み込みに失敗しました',
                                             style: TextStyle(
                                               fontFamily: 'MPLUSRounded1c',
-                                              color:
-                                                  Theme.of(
-                                                    context,
-                                                  ).colorScheme.error,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.error,
                                             ),
                                           ),
                                         ],
@@ -309,8 +307,9 @@ class _SwipeCardState extends State<SwipeCard>
                                     fontSize: 18,
                                     fontFamily: 'MPLUSRounded1c',
                                     fontWeight: FontWeight.bold,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
                                 ),
                               const SizedBox(height: 4),
@@ -322,10 +321,9 @@ class _SwipeCardState extends State<SwipeCard>
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.primaryContainer,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primaryContainer,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -334,10 +332,9 @@ class _SwipeCardState extends State<SwipeCard>
                                         fontSize: 14,
                                         fontFamily: 'MPLUSRounded1c',
                                         fontWeight: FontWeight.w500,
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onPrimaryContainer,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                   ),
@@ -359,21 +356,23 @@ class _SwipeCardState extends State<SwipeCard>
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color:
-                            isLiked
-                                ? Theme.of(
-                                  context,
-                                ).colorScheme.secondary.withValues(alpha: 0.9)
-                                : Theme.of(
-                                  context,
-                                ).colorScheme.error.withValues(alpha: 0.9),
+                        color: isLiked
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.secondary.withValues(alpha: 0.9)
+                            : Theme.of(
+                                context,
+                              ).colorScheme.error.withValues(alpha: 0.9),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: (isLiked
-                                    ? Theme.of(context).colorScheme.secondary
-                                    : Theme.of(context).colorScheme.error)
-                                .withValues(alpha: 0.5),
+                            color:
+                                (isLiked
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.secondary
+                                        : Theme.of(context).colorScheme.error)
+                                    .withValues(alpha: 0.5),
                             blurRadius: 10,
                             spreadRadius: 2,
                           ),

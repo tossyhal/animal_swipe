@@ -67,7 +67,7 @@ class AppTheme {
       backgroundColor: backgroundColor,
       foregroundColor: foregroundColor,
       centerTitle: true,
-      titleTextStyle: TextStyle(
+      titleTextStyle: const TextStyle(
         fontFamily: AppStrings.fontFamily,
         fontWeight: FontWeight.bold,
         fontSize: AppConstants.fontSizeXXLarge,

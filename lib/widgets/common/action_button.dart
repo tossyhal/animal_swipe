@@ -40,18 +40,17 @@ class ActionButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: isEnabled ? backgroundColor : Colors.grey.shade400,
               shape: BoxShape.circle,
-              boxShadow:
-                  isEnabled
-                      ? [
-                        BoxShadow(
-                          color: backgroundColor.withValues(
-                            alpha: AppConstants.opacityLow,
-                          ),
-                          blurRadius: 12,
-                          offset: const Offset(0, 5),
+              boxShadow: isEnabled
+                  ? [
+                      BoxShadow(
+                        color: backgroundColor.withValues(
+                          alpha: AppConstants.opacityLow,
                         ),
-                      ]
-                      : null,
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
+                      ),
+                    ]
+                  : null,
             ),
             child: Icon(
               icon,

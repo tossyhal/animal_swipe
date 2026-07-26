@@ -31,8 +31,10 @@ class PrefsService {
   /// 指定された動物タイプリストをローカルストレージに保存する
   Future<void> saveSelectedAnimalTypes(List<String> types) async {
     // 空文字列や空白文字列を除外し、重複を排除
-    final validTypes =
-        types.where((type) => type.trim().isNotEmpty).toSet().toList();
+    final validTypes = types
+        .where((type) => type.trim().isNotEmpty)
+        .toSet()
+        .toList();
     await _prefs.setStringList(_selectedTypesKey, validTypes);
   }
 }
