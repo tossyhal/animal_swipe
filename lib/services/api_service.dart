@@ -6,7 +6,10 @@ import 'package:http/http.dart' as http;
 import '../models/animal_model.dart';
 import '../utils/logger.dart';
 
-final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
+/// APIサービスを提供するプロバイダー
+/// テストでは [IApiService] の Fake で override できるよう、
+/// 具象型ではなくインターフェース型で公開する
+final apiServiceProvider = Provider<IApiService>((ref) => ApiService());
 
 /// APIサービスのインターフェース
 abstract class IApiService {

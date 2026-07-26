@@ -34,33 +34,20 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   int _loadMoreCallCount = 0;
   bool _shouldSimulateError = false;
 
-  FakeAnimalImagesNotifier(this._initialImages)
-    : super(FakeApiService(), ['cat', 'dog']) {
-    state = _initialImages;
-  }
+  FakeAnimalImagesNotifier(this._initialImages);
 
-  bool _mounted = true;
-
+  /// 実装側の [build] は apiServiceProvider / selectedAnimalTypesProvider を
+  /// watch するが、Fake では外部依存を持たず初期リストをそのまま返す
   @override
-  bool get mounted => _mounted;
-
-  @override
-  void dispose() {
-    _mounted = false;
-    super.dispose();
-  }
+  List<AnimalImage> build() => _initialImages;
 
   @override
   Future<void> loadInitialImages() async {
-    if (!mounted) return;
-
     if (_shouldSimulateError) {
       state = [];
-      if (!mounted) return;
       throw Exception('Failed to load images');
     }
 
-    if (!mounted) return;
     state = _initialImages;
   }
 
@@ -126,7 +113,7 @@ void main() {
       ]);
       container = ProviderContainer(
         overrides: [
-          animalImagesProvider.overrideWith((_) => fakeNotifier),
+          animalImagesProvider.overrideWith(() => fakeNotifier),
           // prefsServiceProvider のオーバーライドを追加
           prefsServiceProvider.overrideWithValue(
             PrefsService(FakeSharedPreferences()),
@@ -172,7 +159,7 @@ void main() {
         fakeNotifier = FakeAnimalImagesNotifier([]);
         container = ProviderContainer(
           overrides: [
-            animalImagesProvider.overrideWith((_) => fakeNotifier),
+            animalImagesProvider.overrideWith(() => fakeNotifier),
             prefsServiceProvider.overrideWithValue(
               PrefsService(FakeSharedPreferences()),
             ),
@@ -322,7 +309,7 @@ void main() {
         fakeNotifier = FakeAnimalImagesNotifier([]);
         container = ProviderContainer(
           overrides: [
-            animalImagesProvider.overrideWith((_) => fakeNotifier),
+            animalImagesProvider.overrideWith(() => fakeNotifier),
             prefsServiceProvider.overrideWithValue(
               PrefsService(FakeSharedPreferences()),
             ),
