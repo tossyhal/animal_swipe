@@ -3,9 +3,9 @@
     "short_name": "Animal Swipe",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Animal Swipe.",
+    "background_color": "#557C64",
+    "theme_color": "#557C64",
+    "description": "犬と猫のかわいい写真を、スワイプでめくって眺めるだけのアプリ。気分のままに、かわいいをめくろう。",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
