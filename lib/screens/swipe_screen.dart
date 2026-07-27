@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
+import '../models/animal_model.dart';
 import '../providers/animal_providers.dart';
 import '../theme/theme_extensions.dart';
 import '../widgets/common/action_button.dart';
@@ -72,9 +75,39 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
     if (removed) _showLikedMessage();
   }
 
+  /// 画面に描画中のスタック（先頭 3 枚）よりさらに先の画像を、
+  /// スワイプで実際にスタックへ入ってくる前にデコードしておく。
+  ///
+  /// スタック内（先頭〜3 枚目）は Widget ツリーに乗った時点で
+  /// `Image.network` が自ら読み込みを始めるため、ここで明示的に
+  /// `precacheImage` するのはスタックの外側（4 枚目以降）だけでよい。
+  void _preloadUpcoming(List<AnimalImage> images) {
+    if (images.length <= 3) return;
+    final upcoming = images.skip(3).take(AppSizes.cardStackPreloadAhead);
+    for (final image in upcoming) {
+      // 失敗しても画面の表示自体には影響しない先読みなので、
+      // エラーはここで握りつぶし、UI 側の errorBuilder に任せる。
+      unawaited(
+        precacheImage(
+          NetworkImage(image.url),
+          context,
+          onError: (error, stackTrace) {},
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final imagesAsync = ref.watch(animalImagesProvider);
+    // 山札が更新されるたびに、スタックの外側にいる次の画像を先読みする
+    ref.listen<AsyncValue<List<AnimalImage>>>(animalImagesProvider, (
+      previous,
+      next,
+    ) {
+      final images = next.value;
+      if (images != null) _preloadUpcoming(images);
+    });
     // 再取得中は前回の値が AsyncLoading に保持されたままになる。
     // 画面はローディング表示なのにボタンだけ効いてしまわないよう、
     // 「いま表示中のカードがあるか」＝ 読み込み中でないこと も条件に含める。
@@ -157,26 +190,21 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                 ),
                 const SizedBox(height: AppSpacing.s14),
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: AppDuration.cardTransition,
-                    child: imagesAsync.when(
-                      skipLoadingOnRefresh: false,
-                      data: (images) {
-                        if (images.isEmpty) return const _LoadingState();
-                        final top = images.first;
-                        return SwipeCard(
-                          key: ValueKey(top.url),
-                          image: top,
-                          onSwipeLeft: () => _skip(deckToken),
-                          onSwipeRight: () => _like(deckToken),
-                        );
+                  child: imagesAsync.when(
+                    skipLoadingOnRefresh: false,
+                    data: (images) {
+                      if (images.isEmpty) return const _LoadingState();
+                      return _CardStack(
+                        images: images,
+                        onSwipeLeft: () => _skip(deckToken),
+                        onSwipeRight: () => _like(deckToken),
+                      );
+                    },
+                    loading: () => const _LoadingState(),
+                    error: (error, stackTrace) => _LoadError(
+                      onRetry: () {
+                        ref.read(animalImagesProvider.notifier).reload();
                       },
-                      loading: () => const _LoadingState(),
-                      error: (error, stackTrace) => _LoadError(
-                        onRetry: () {
-                          ref.read(animalImagesProvider.notifier).reload();
-                        },
-                      ),
                     ),
                   ),
                 ),
@@ -204,6 +232,86 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 山札の先頭 3 枚を [Stack] で重ねて「束」に見せるカードスタック。
+///
+/// 次の 2 枚を最初から Widget ツリーに乗せておくことで、スワイプ完了直後に
+/// `Image.network` の読み込み待ちでスピナーが出る問題（#6）を解消する。
+/// 先頭以外は [IgnorePointer] でジェスチャを受けない。
+class _CardStack extends StatelessWidget {
+  final List<AnimalImage> images;
+  final VoidCallback onSwipeLeft;
+  final VoidCallback onSwipeRight;
+
+  static const int _visibleCount = 3;
+
+  const _CardStack({
+    required this.images,
+    required this.onSwipeLeft,
+    required this.onSwipeRight,
+  });
+
+  /// 表示対象の先頭 [_visibleCount] 枚。
+  ///
+  /// 重複排除はしない。ランダム画像 API は同じ URL を連続して返し得るが、
+  /// 山札から取り除かれるのは常に先頭の 1 枚だけなので、ここで間引くと
+  /// 「次に出るカード」の予告が実際の山札とずれてしまう。
+  List<AnimalImage> get _visible =>
+      images.take(_visibleCount).toList(growable: false);
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _visible;
+
+    return Stack(
+      alignment: Alignment.center,
+      // 奥（末尾）から積むことで、先頭カード（index 0）が最前面になる
+      children: [
+        for (var i = visible.length - 1; i >= 0; i--) _layer(visible[i], i),
+      ],
+    );
+  }
+
+  Widget _layer(AnimalImage image, int index) {
+    // キーは URL ではなく [ObjectKey]（＝ identical 比較）を使う。
+    //
+    // SwipeCard は _dragOffset という進行中のドラッグ状態を持つため、
+    // 山札が 1 枚進んだら先頭スロットの Element を作り直させる必要がある。
+    // URL をキーにすると、API が同じ URL を連続で返したときに
+    // キーが変わらず、前のカードのドラッグ状態が引き継がれてしまう。
+    // 山札の各要素はパース時に生成された別インスタンスなので、
+    // ObjectKey なら URL が重複していても 1 枚ずつ別物として扱える。
+    final card = SwipeCard(
+      key: ObjectKey(image),
+      image: image,
+      onSwipeLeft: onSwipeLeft,
+      onSwipeRight: onSwipeRight,
+    );
+
+    if (index == 0) return card;
+
+    final scale = index == 1
+        ? AppSizes.cardStackScaleSecond
+        : AppSizes.cardStackScaleThird;
+    final offsetY = index == 1
+        ? AppSizes.cardStackOffsetSecond
+        : AppSizes.cardStackOffsetThird;
+
+    // 背面のカードは「次に来る絵」を覗かせるための装飾でしかない。
+    // IgnorePointer が外すのはポインタ関連のセマンティクスだけで、
+    // 配下のテキストは読み上げ対象に残るため、ExcludeSemantics で
+    // 明示的に除外する。そうしないとスクリーンリーダーが
+    // 手前のカードに続けて 2 枚目・3 枚目の説明まで読み上げてしまう。
+    return ExcludeSemantics(
+      child: IgnorePointer(
+        child: Transform.translate(
+          offset: Offset(0, offsetY),
+          child: Transform.scale(scale: scale, child: card),
         ),
       ),
     );

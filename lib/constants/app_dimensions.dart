@@ -234,4 +234,25 @@ class AppSizes {
 
   /// スワイプ方向バッジを出し始めるドラッグ量
   static const double swipeBadgeRevealDistance = 20;
+
+  // ---- カードスタック（#6） ----
+  //
+  // `images.take(3)` を Stack で重ねて表示する際の、先頭より奥にある
+  // カードの見た目調整。奥に行くほど小さく・下にずらして「束」に見せる。
+
+  /// スタック 2 枚目（先頭の 1 つ奥）の縮小率
+  static const double cardStackScaleSecond = 0.96;
+
+  /// スタック 3 枚目（先頭の 2 つ奥）の縮小率
+  static const double cardStackScaleThird = 0.92;
+
+  /// スタック 2 枚目を下にずらす量
+  static const double cardStackOffsetSecond = 10;
+
+  /// スタック 3 枚目を下にずらす量
+  static const double cardStackOffsetThird = 20;
+
+  /// 画面に表示中のスタック（3 枚）よりさらに先の、明示的に
+  /// `precacheImage` で先読みしておく枚数
+  static const int cardStackPreloadAhead = 2;
 }

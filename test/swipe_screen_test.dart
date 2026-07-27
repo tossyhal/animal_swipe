@@ -203,6 +203,214 @@ void main() {
       });
     });
 
+    group('カードスタックテスト（#6）', () {
+      testWidgets('山札が3枚を超えても先頭3枚だけがスタックとして描画されること', (tester) async {
+        fakeNotifier = FakeAnimalImagesNotifier([
+          for (var i = 0; i < 5; i++)
+            AnimalImage(
+              id: '$i',
+              url: 'http://example.com/$i.jpg',
+              type: AnimalType.cat,
+            ),
+        ]);
+        container = ProviderContainer(
+          overrides: [
+            animalImagesProvider.overrideWith(() => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // 山札は5枚あるが、スタックに乗るのは先頭3枚だけ
+        expect(find.byType(SwipeCard), findsNWidgets(3));
+      });
+
+      testWidgets('先頭以外のカードはIgnorePointerでジェスチャを受けないこと', (tester) async {
+        final images = [
+          for (var i = 0; i < 3; i++)
+            AnimalImage(
+              id: '$i',
+              url: 'http://example.com/$i.jpg',
+              type: AnimalType.cat,
+            ),
+        ];
+        fakeNotifier = FakeAnimalImagesNotifier(images);
+        container = ProviderContainer(
+          overrides: [
+            animalImagesProvider.overrideWith(() => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // 2枚目・3枚目は IgnorePointer(ignoring: true) の配下にあり、
+        // ジェスチャを受けない。Flutter フレームワーク自体も他の目的で
+        // IgnorePointer を使うことがあるため、「ignoring:true を持つものが
+        // 祖先に少なくとも1つある」ことを確認する
+        for (var i = 1; i < 3; i++) {
+          final cardFinder = find.byKey(ObjectKey(images[i]));
+          expect(cardFinder, findsOneWidget);
+          final ancestors = tester.widgetList<IgnorePointer>(
+            find.ancestor(of: cardFinder, matching: find.byType(IgnorePointer)),
+          );
+          expect(
+            ancestors.any((widget) => widget.ignoring),
+            isTrue,
+            reason: '$i枚目はジェスチャを遮る IgnorePointer 配下にあるべき',
+          );
+        }
+
+        // 先頭カードは、祖先の IgnorePointer がどれも ignoring:false
+        // （＝実際には操作を遮っていない）こと
+        final topCardFinder = find.byKey(ObjectKey(images.first));
+        final topAncestors = tester.widgetList<IgnorePointer>(
+          find.ancestor(
+            of: topCardFinder,
+            matching: find.byType(IgnorePointer),
+          ),
+        );
+        expect(
+          topAncestors.any((widget) => widget.ignoring),
+          isFalse,
+          reason: '先頭カードはどの祖先からもジェスチャを遮られていない',
+        );
+      });
+
+      testWidgets('先頭以外のカードは読み上げ対象から除外されること', (tester) async {
+        final images = [
+          for (var i = 0; i < 3; i++)
+            AnimalImage(
+              id: '$i',
+              url: 'http://example.com/$i.jpg',
+              type: AnimalType.cat,
+            ),
+        ];
+        fakeNotifier = FakeAnimalImagesNotifier(images);
+        container = ProviderContainer(
+          overrides: [
+            animalImagesProvider.overrideWith(() => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // IgnorePointer が外すのはポインタ関連のセマンティクスだけなので、
+        // 背面カードのテキストはそれだけでは読み上げ対象に残ってしまう。
+        // ExcludeSemantics で明示的に除外していることを確認する。
+        for (var i = 1; i < 3; i++) {
+          final cardFinder = find.byKey(ObjectKey(images[i]));
+          expect(cardFinder, findsOneWidget);
+          expect(
+            find.ancestor(
+              of: cardFinder,
+              matching: find.byType(ExcludeSemantics),
+            ),
+            findsWidgets,
+            reason: '$i枚目は ExcludeSemantics 配下にあるべき',
+          );
+        }
+
+        // 先頭カードは読み上げ対象に残っている
+        final topAncestors = tester.widgetList<ExcludeSemantics>(
+          find.ancestor(
+            of: find.byKey(ObjectKey(images.first)),
+            matching: find.byType(ExcludeSemantics),
+          ),
+        );
+        expect(
+          topAncestors.any((widget) => widget.excluding),
+          isFalse,
+          reason: '先頭カードは読み上げ対象から外れてはいけない',
+        );
+      });
+
+      testWidgets('URL が重複していても山札の順序どおりに3枚描画されること', (tester) async {
+        // ランダム画像 API は同じ URL を連続して返し得る。
+        // ここで重複を間引くと「次に出るカード」の予告が実際の山札と
+        // ずれる（[A, A, B] を [A, B] と描くと、1 回スワイプした後に
+        // B ではなく A が出てきて予告が嘘になる）。
+        final images = [
+          const AnimalImage(
+            id: 'a1',
+            url: 'http://example.com/same.jpg',
+            type: AnimalType.cat,
+          ),
+          const AnimalImage(
+            id: 'a2',
+            url: 'http://example.com/same.jpg',
+            type: AnimalType.cat,
+          ),
+          const AnimalImage(
+            id: 'b',
+            url: 'http://example.com/other.jpg',
+            type: AnimalType.cat,
+          ),
+        ];
+        fakeNotifier = FakeAnimalImagesNotifier(images);
+        container = ProviderContainer(
+          overrides: [
+            animalImagesProvider.overrideWith(() => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // 間引かれていれば 2 枚しか出ない
+        expect(tester.takeException(), isNull);
+        expect(find.byType(SwipeCard), findsNWidgets(3));
+
+        // ObjectKey は identical 比較なので、URL と値が同じでも
+        // 山札の各要素が別のキーとして扱われる
+        for (final image in images) {
+          expect(
+            find.byKey(ObjectKey(image)),
+            findsOneWidget,
+            reason: '${image.id} が描画されていない',
+          );
+        }
+      });
+    });
+
     group('インタラクションテスト', () {
       testWidgets('アクションボタン（×）をタップすると次の画像が表示されること', (tester) async {
         await tester.pumpWidget(
@@ -386,7 +594,8 @@ void main() {
         api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
-        expect(find.byType(SwipeCard), findsOneWidget);
+        // 山札は2枚（cat, dog）で、どちらもスタックに乗る
+        expect(find.byType(SwipeCard), findsNWidgets(2));
 
         InkWell skipButton() => tester.widget<InkWell>(
           find.ancestor(
@@ -397,8 +606,21 @@ void main() {
 
         expect(skipButton().onTap, isNotNull, reason: 'カード表示中は操作できる');
 
+        // カードスタック化（#6）前は、選択変更後も AnimatedSwitcher が
+        // 退場中の古いカードを 250ms 保持し続けたため、その間にスワイプが
+        // 飛んで来ないかをウィジェットレベルで確認していた。
+        // スタック化後は古いカードが即座にツリーから外れるため、その
+        // タイミング依存のシナリオ自体が発生しない。
+        //
+        // 本質的に守りたい不変条件は「表示時点の deckToken と異なる
+        // 山札に対する操作は無視される」ことなので、それを Notifier に
+        // 対して直接確認する。
+        final staleToken = realContainer
+            .read(animalImagesProvider.notifier)
+            .deckGeneration;
+
         // 選択を変更 → provider が再 build され、前回値を保持したまま
-        // AsyncLoading になる
+        // AsyncLoading になる（山札の世代も入れ替わる）
         realContainer
             .read(selectedAnimalTypesProvider.notifier)
             .selectType(AnimalType.dog, false);
@@ -407,18 +629,19 @@ void main() {
         // ボタンの無効化はフレーム単位で即座に反映される
         expect(skipButton().onTap, isNull, reason: '再取得中に古い山札へ操作できてはいけない');
 
-        // AnimatedSwitcher が退場中のカードを保持している間にスワイプしても、
-        // 古い山札で state を上書きしてはいけない
-        await tester.drag(find.byType(SwipeCard), const Offset(-400, 0));
-        await tester.pump(const Duration(milliseconds: 300));
+        // 古い deckToken での操作は「その山札はもう表示されていない」ため
+        // 何も取り除かず false を返す。再取得中の state を壊してもいけない。
+        final removed = realContainer
+            .read(animalImagesProvider.notifier)
+            .removeTopImage(deckToken: staleToken);
+        expect(removed, isFalse, reason: '古い山札への操作は無視される');
         expect(
           realContainer.read(animalImagesProvider).isLoading,
           isTrue,
-          reason: '退場中のカードへのスワイプで再取得中状態が壊されないこと',
+          reason: '古い操作で再取得中状態が壊されないこと',
         );
 
-        // カードの消滅は AnimatedSwitcher の退場アニメーション後
-        await tester.pump(const Duration(milliseconds: 300));
+        // 再取得が終わっていない間は、カードスタックではなくローディング表示
         expect(find.byType(SwipeCard), findsNothing, reason: 'ローディング表示に変わる');
         expect(find.text(AppStrings.loading), findsOneWidget);
       });
