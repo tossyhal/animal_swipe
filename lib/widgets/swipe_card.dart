@@ -184,61 +184,61 @@ class _SwipeCardState extends State<SwipeCard>
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              Hero(
-                                tag:
-                                    '${AppStrings.animalImageHeroTagPrefix}'
-                                    '${widget.image.id}',
-                                child: Image.network(
-                                  widget.image.url,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  loadingBuilder:
-                                      (context, child, loadingProgress) {
-                                        if (loadingProgress == null) {
-                                          return child;
-                                        }
-                                        return Center(
-                                          child: CircularProgressIndicator(
-                                            value:
-                                                loadingProgress
-                                                        .expectedTotalBytes !=
-                                                    null
-                                                ? loadingProgress
-                                                          .cumulativeBytesLoaded /
-                                                      loadingProgress
-                                                          .expectedTotalBytes!
-                                                : null,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                  colors.primary,
-                                                ),
-                                          ),
-                                        );
-                                      },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.error_outline,
-                                            size: AppSizes.iconImageError,
-                                            color: colors.error,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            AppStrings.imageLoadError,
-                                            style: TextStyle(
-                                              color: colors.error,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
+                              // ここには以前 Hero が置かれていたが、遷移先に
+                              // 対応する Hero が無く何も起きていなかった。
+                              // 一方でカードスタック（#6）により同じ画像が
+                              // 同時に複数枚描かれ得るため、tag 衝突で
+                              // 「multiple heroes that share the same tag」
+                              // アサーションを踏むリスクだけが残っていた。
+                              // 全画面拡大表示を入れる時に改めて導入する。
+                              Image.network(
+                                widget.image.url,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) {
+                                        return child;
+                                      }
+                                      return Center(
+                                        child: CircularProgressIndicator(
+                                          value:
+                                              loadingProgress
+                                                      .expectedTotalBytes !=
+                                                  null
+                                              ? loadingProgress
+                                                        .cumulativeBytesLoaded /
+                                                    loadingProgress
+                                                        .expectedTotalBytes!
+                                              : null,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                colors.primary,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.error_outline,
+                                          size: AppSizes.iconImageError,
+                                          color: colors.error,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          AppStrings.imageLoadError,
+                                          style: TextStyle(color: colors.error),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                               // 画像の上部に半透明のグラデーションを追加
                               Positioned(

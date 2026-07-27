@@ -354,6 +354,58 @@ void main() {
         );
       });
 
+      testWidgets('重複画像を含む山札でも Hero のタグ衝突で落ちないこと（#26）', (tester) async {
+        // 同じ画像が同時にスタックへ並ぶと、id 由来の Hero タグが重複して
+        // 「multiple heroes that share the same tag」で落ちていた。
+        // Hero は遷移先が無く機能していなかったため削除済み。
+        final images = [
+          for (var i = 0; i < 3; i++)
+            const AnimalImage(
+              id: 'dup',
+              url: 'http://example.com/dup.jpg',
+              type: AnimalType.cat,
+            ),
+        ];
+        fakeNotifier = FakeAnimalImagesNotifier(images);
+        container = ProviderContainer(
+          overrides: [
+            animalImagesProvider.overrideWith(() => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(tester.takeException(), isNull);
+        expect(
+          find.byType(Hero),
+          findsNothing,
+          reason: '機能していない Hero を再び持ち込まない',
+        );
+
+        // ルート遷移を開始しても Hero の重複アサーションを踏まない
+        final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+        unawaited(
+          navigator.push(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('next')),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('URL が重複していても山札の順序どおりに3枚描画されること', (tester) async {
         // ランダム画像 API は同じ URL を連続して返し得る。
         // ここで重複を間引くと「次に出るカード」の予告が実際の山札と
