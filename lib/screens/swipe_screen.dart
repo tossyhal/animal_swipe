@@ -84,15 +84,27 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
   void _preloadUpcoming(List<AnimalImage> images) {
     if (images.length <= 3) return;
     final upcoming = images.skip(3).take(AppSizes.cardStackPreloadAhead);
+    // SwipeCard の Image.network と同じ cacheHeight を使い、同じ
+    // ImageProvider（ResizeImage でラップされたもの）を組み立てる（#7）。
+    //
+    // image.url をそのまま使う（＝ AnimalSource が組み立てた URL を
+    // 再構築しない）だけでは足りない。SwipeCard 側は cacheHeight を
+    // 指定しており、Image.network は内部で
+    // `ResizeImage.resizeIfNeeded(..., cacheHeight, NetworkImage(url))` に
+    // 差し替える。ImageCache のキーはこのラップ後の値で決まるため、
+    // ここで素の NetworkImage を precache しても表示側とは別キー扱いに
+    // なり、先読みが丸ごと無駄になって表示時に同じ画像を 2 回取得して
+    // しまう。そのため cardImageCacheHeight を通じて同じ高さを使い、
+    // ResizeImage を明示的に組み立てて渡す。
+    final cacheHeight = cardImageCacheHeight(context);
     for (final image in upcoming) {
+      final ImageProvider provider = cacheHeight != null
+          ? ResizeImage(NetworkImage(image.url), height: cacheHeight)
+          : NetworkImage(image.url);
       // 失敗しても画面の表示自体には影響しない先読みなので、
       // エラーはここで握りつぶし、UI 側の errorBuilder に任せる。
       unawaited(
-        precacheImage(
-          NetworkImage(image.url),
-          context,
-          onError: (error, stackTrace) {},
-        ),
+        precacheImage(provider, context, onError: (error, stackTrace) {}),
       );
     }
   }

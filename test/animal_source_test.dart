@@ -76,8 +76,20 @@ void main() {
 
       expect(images.length, 2);
       expect(images.first.id, 'a1');
-      expect(images.first.url, 'https://cataas.com/cat/a1');
+      expect(images.first.url, 'https://cataas.com/cat/a1?height=1600');
       expect(images.first.type, AnimalType.cat);
+    });
+
+    // 原寸画像が毎回ダウンロードされる問題（#7）への対応。
+    // Cataas は /cat/{id}?height= でサーバー側リサイズに対応している。
+    // 表示は BoxFit.cover のポートレートペインなので、横長画像でも
+    // アップスケールされないよう width ではなく height を指定する。
+    test('画像 URL に Cataas の height パラメータが付く', () {
+      final images = source.parseResponse('[{"id":"a1"}]');
+
+      final uri = Uri.parse(images.first.url);
+      expect(uri.queryParameters['height'], '$kCatImageHeight');
+      expect(uri.queryParameters.containsKey('width'), isFalse);
     });
 
     test('id が欠けている要素は読み飛ばす', () {
@@ -113,6 +125,21 @@ void main() {
       expect(images.length, 1);
       expect(images.first.url, 'https://images.dog.ceo/breeds/hound/a.jpg');
       expect(images.first.type, AnimalType.dog);
+    });
+
+    // Dog CEO はリサイズ用のクエリパラメータに対応していないため、
+    // Cataas と違い URL には一切手を加えない（#7）。
+    test('Dog CEO の URL にはリサイズ用パラメータを付けない（非対応のため）', () {
+      final images = source.parseResponse(
+        '{"message":["https://images.dog.ceo/breeds/hound/a.jpg"],'
+        '"status":"success"}',
+      );
+
+      expect(
+        images.first.url,
+        'https://images.dog.ceo/breeds/hound/a.jpg',
+        reason: '画像 URL をそのまま使い、クエリパラメータを追加しない',
+      );
     });
 
     test('status が success でなければ FormatException', () {

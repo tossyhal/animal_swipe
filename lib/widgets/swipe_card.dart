@@ -1,8 +1,56 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
 import '../models/animal_model.dart';
+import '../services/animal_source.dart' show kCatImageHeight;
 import '../theme/theme_extensions.dart';
+
+/// [cardImageCacheHeight] が高さを丸め込むバケツの単位（デバイス px）。
+///
+/// ウィンドウリサイズ・分割画面・回転のたびに 1px 単位で
+/// `ResizeImage` の `ImageCache` キーが変わると、表示中の3枚が総入れ替え
+/// で再フェッチされる「リクエストの嵐」が起きる（#7）。この単位で
+/// 高さを切り上げてバケツ化することで、近い高さのビューポートは
+/// 同じキーを共有し、リサイズのたびにキーがずれるのを防ぐ。
+const int kCardImageCacheHeightBucket = 256;
+
+/// カード画像の `cacheHeight`（デコード解像度）に使う縦幅を計算する（#7）。
+///
+/// 表示は `BoxFit.cover` のポートレートなペインのため、リサイズの基準は
+/// 幅ではなく高さ（cover でクロップされずに残る側）にする必要がある
+/// （[kCatImageHeight] のコメント参照。横長画像を幅基準でリクエストすると
+/// 高さが足りずアップスケールされ画質が劣化していた）。
+///
+/// スワイプ画面の先読み（[SwipeScreen] 内の `precacheImage`）と実際の表示
+/// （本ファイルの [Image.network]）の両方がこの関数を経由することで、
+/// `ResizeImage` でラップされた `ImageProvider` の `ImageCache` キーが
+/// 完全に一致し、先読みした画像が表示時に取り直されてしまう二重フェッチ
+/// を防ぐ。
+///
+/// カードの実測レイアウト高さではなく画面高さを基準にしているのは、
+/// 先読み時点ではまだレイアウトされていない先のカードについて
+/// 実測値を再現できないため（先読みと表示のどちらで呼んでも同じ整数を
+/// 返せることを優先する）。カードはほぼ画面いっぱいに表示されるので、
+/// 画面高さを使っても実用上問題はなく、多少大きめにデコードされるだけの
+/// 安全側の近似になる。
+///
+/// [kCardImageCacheHeightBucket] px 単位に切り上げてバケツ化した上で、
+/// 取得画像自体の高さ（[kCatImageHeight]）でクランプする。実際に届く
+/// バイト列より大きくデコードしても無意味なため。
+///
+/// レイアウトが確定できない（`MediaQuery.size` が 0 など）場合は
+/// `null` を返し、リサイズなし（原寸デコード）にフォールバックする。
+int? cardImageCacheHeight(BuildContext context) {
+  final mediaQuery = MediaQuery.of(context);
+  final rawHeight = mediaQuery.size.height * mediaQuery.devicePixelRatio;
+  if (rawHeight <= 0) return null;
+  final bucketed =
+      (rawHeight / kCardImageCacheHeightBucket).ceil() *
+      kCardImageCacheHeightBucket;
+  return math.min(bucketed, kCatImageHeight);
+}
 
 class SwipeCard extends StatefulWidget {
   final AnimalImage image;
@@ -197,101 +245,10 @@ class _SwipeCardState extends State<SwipeCard>
                 child: Column(
                   children: [
                     Expanded(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // ここには以前 Hero が置かれていたが、遷移先に
-                          // 対応する Hero が無く何も起きていなかった。
-                          // 一方でカードスタック（#6）により同じ画像が
-                          // 同時に複数枚描かれ得るため、tag 衝突で
-                          // 「multiple heroes that share the same tag」
-                          // アサーションを踏むリスクだけが残っていた。
-                          // 全画面拡大表示を入れる時に改めて導入する。
-                          Image.network(
-                            widget.image.url,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) {
-                                return child;
-                              }
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value:
-                                      loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                            loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    colors.primary,
-                                  ),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.error_outline,
-                                      size: AppSizes.iconImageError,
-                                      color: colors.error,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      AppStrings.imageLoadError,
-                                      style: TextStyle(color: colors.error),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                          // 画像の上部に半透明のグラデーションを追加
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: AppSizes.imageScrimHeight,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    colors.scrim.withValues(
-                                      alpha: AppOpacity.imageScrim,
-                                    ),
-                                    Colors.transparent,
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          // 画像の下部に半透明のグラデーションを追加
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: AppSizes.imageScrimHeight,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
-                                  colors: [
-                                    colors.scrim.withValues(
-                                      alpha: AppOpacity.imageScrim,
-                                    ),
-                                    Colors.transparent,
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: _CardImage(
+                        url: widget.image.url,
+                        cacheHeight: cardImageCacheHeight(context),
+                        colors: colors,
                       ),
                     ),
                     Container(
@@ -392,6 +349,126 @@ class _SwipeCardState extends State<SwipeCard>
           ],
         ),
       ),
+    );
+  }
+}
+
+/// スワイプカードの画像本体（読み込み中・エラー時の表示を含む）
+///
+/// [SwipeCard.build] から切り出したもの。
+class _CardImage extends StatelessWidget {
+  final String url;
+  final int? cacheHeight;
+  final ColorScheme colors;
+
+  const _CardImage({
+    required this.url,
+    required this.cacheHeight,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // ここには以前 Hero が置かれていたが、遷移先に
+        // 対応する Hero が無く何も起きていなかった。
+        // 一方でカードスタック（#6）により同じ画像が
+        // 同時に複数枚描かれ得るため、tag 衝突で
+        // 「multiple heroes that share the same tag」
+        // アサーションを踏むリスクだけが残っていた。
+        // 全画面拡大表示を入れる時に改めて導入する。
+        //
+        // cacheHeight（[cardImageCacheHeight]）は、原寸のままデコードされて
+        // 確保されるメモリを抑えるための指定（#7）。転送量そのものは
+        // URL 側の height 指定（AnimalSource 側）で減らしているので、
+        // これは「取得したバイト列をどのサイズでデコードするか」という
+        // 別軸の最適化になる。BoxFit.cover のポートレートペインなので
+        // width ではなく height を基準にする（cardImageCacheHeight 参照）。
+        //
+        // 注意: Flutter Web の HTML レンダラーでは cacheWidth/cacheHeight
+        // はほとんど無視され、ブラウザ側が画像のデコードを担う。
+        // したがってここでの効果は非 Web プラットフォーム限定。
+        Image.network(
+          url,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          cacheHeight: cacheHeight,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) {
+              return child;
+            }
+            return Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                    : null,
+                valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: AppSizes.iconImageError,
+                    color: colors.error,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    AppStrings.imageLoadError,
+                    style: TextStyle(color: colors.error),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        // 画像の上部に半透明のグラデーションを追加
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            height: AppSizes.imageScrimHeight,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colors.scrim.withValues(alpha: AppOpacity.imageScrim),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+        // 画像の下部に半透明のグラデーションを追加
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            height: AppSizes.imageScrimHeight,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  colors.scrim.withValues(alpha: AppOpacity.imageScrim),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

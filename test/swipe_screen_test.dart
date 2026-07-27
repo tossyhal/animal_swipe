@@ -1,5 +1,8 @@
 // test/swipe_screen_test.dart
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -120,6 +123,88 @@ class _DeferredApiService implements IApiService {
         ),
     ]);
   }
+}
+
+/// [Image.network] のテストで実際にネットワークへ出ずに済ませるための
+/// 最小の [HttpClient] フェイク。有効な 1x1 透明 PNG を常に返す。
+///
+/// 使うのは `getUrl` / `HttpClientRequest.headers` /
+/// `HttpClientRequest.close` / `HttpClientResponse` の
+/// `statusCode`・`contentLength`・`compressionState`・`listen` だけ
+/// （[NetworkImage._loadAsync] が実際に触る範囲）なので、他のメンバーは
+/// 未実装のまま `noSuchMethod` に委ねている。
+class _FakeImageHttpClient implements HttpClient {
+  /// 実際にリクエストされた URL の記録。
+  ///
+  /// 先読み（precacheImage）と表示（Image.network）の ImageProvider が
+  /// 別キー扱いになっていないかは、ImageCache の中身を覗くよりも
+  /// 「同じ URL に対して HTTP リクエストが何回飛んだか」を直接数えた方が
+  /// Flutter 内部実装の詳細に依存せず確実（#7）。
+  final List<Uri> requestedUrls = <Uri>[];
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async {
+    requestedUrls.add(url);
+    return _FakeImageHttpClientRequest();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeImageHttpClientRequest implements HttpClientRequest {
+  @override
+  final HttpHeaders headers = _FakeImageHttpHeaders();
+
+  @override
+  Future<HttpClientResponse> close() async => _FakeImageHttpClientResponse();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeImageHttpHeaders implements HttpHeaders {
+  @override
+  void add(String name, Object value, {bool preserveHeaderCase = false}) {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeImageHttpClientResponse implements HttpClientResponse {
+  // 内容自体はテストの関心事ではないため、デコード可能な最小の PNG。
+  static final Uint8List _bytes = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk'
+    '+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  );
+
+  @override
+  int get statusCode => HttpStatus.ok;
+
+  @override
+  int get contentLength => _bytes.length;
+
+  @override
+  HttpClientResponseCompressionState get compressionState =>
+      HttpClientResponseCompressionState.notCompressed;
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int> event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return Stream<List<int>>.fromIterable(<List<int>>[_bytes]).listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
@@ -459,6 +544,90 @@ void main() {
             findsOneWidget,
             reason: '${image.id} が描画されていない',
           );
+        }
+      });
+    });
+
+    group('画像先読みテスト（#7）', () {
+      testWidgets('先読みされた画像が表示時に再フェッチされないこと（二重フェッチ防止）', (tester) async {
+        // SwipeCard は Image.network に cacheHeight を指定しており、内部で
+        // ResizeImage にラップされた ImageProvider を使う。precacheImage
+        // 側がそれと違う ImageProvider（違う ImageCache キー）で先読みして
+        // いると、山札を進めてカードが実際にスタック内へ入ってきた時点で
+        // 同じ画像に対しもう一度 HTTP リクエストが飛んでしまう。
+        // ここでは HTTP リクエストの回数を直接数えることで、Flutter 内部の
+        // ImageCache/ResizeImage の実装詳細に依存せず二重フェッチの有無を
+        // 確認する。
+        //
+        // 実ネットワークに出ず、常に成功する最小の HttpClient に差し替える。
+        // 何もしないとテスト環境にはネットワークが無く、先読みが即座に
+        // 失敗して ImageCache から取り除かれてしまい、検証できない。
+        // debug 変数はテスト終了時に必ず戻す。binding が「テスト内で変更
+        // したままになっていないか」を毎テスト直後に検証するため、
+        // addTearDown（package:test 側の登録）だとその検証より後に
+        // 実行されてしまい間に合わない。try/finally でテスト本体の中で
+        // 戻し切る。
+        final fakeClient = _FakeImageHttpClient();
+        debugNetworkImageHttpClientProvider = () => fakeClient;
+        imageCache.clear();
+        try {
+          final images = [
+            for (var i = 0; i < 5; i++)
+              AnimalImage(
+                id: '$i',
+                url: 'https://cataas.com/cat/$i?height=1600',
+                type: AnimalType.cat,
+              ),
+          ];
+          fakeNotifier = FakeAnimalImagesNotifier(images);
+          container = ProviderContainer(
+            overrides: [
+              animalImagesProvider.overrideWith(() => fakeNotifier),
+              prefsServiceProvider.overrideWithValue(
+                PrefsService(FakeSharedPreferences()),
+              ),
+            ],
+          );
+
+          await tester.pumpWidget(
+            UncontrolledProviderScope(
+              container: container,
+              child: const MaterialApp(home: SwipeScreen()),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+
+          // 4枚目（images[3]）はスタック（先頭3枚）の外側なので、
+          // ここまでで先読みが 1 回走っているはず
+          final targetUrl = Uri.parse(images[3].url);
+          int requestCountFor(Uri url) =>
+              fakeClient.requestedUrls.where((u) => u == url).length;
+
+          expect(
+            requestCountFor(targetUrl),
+            1,
+            reason: '先読みで 1 回だけリクエストされているべき',
+          );
+
+          // 山札を3回進め、images[3] がスタックへ入って実際に
+          // Image.network で表示されるようにする
+          for (var i = 0; i < 3; i++) {
+            fakeNotifier.removeTopImage();
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 300));
+          }
+          expect(find.byKey(ObjectKey(images[3])), findsOneWidget);
+
+          // 表示された後も、同じ URL へのリクエストは先読み分の 1 回だけ
+          expect(
+            requestCountFor(targetUrl),
+            1,
+            reason: '表示時に同じ URL を再フェッチしてはいけない（二重フェッチ）',
+          );
+        } finally {
+          debugNetworkImageHttpClientProvider = null;
+          imageCache.clear();
         }
       });
     });

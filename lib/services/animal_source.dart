@@ -12,6 +12,24 @@ import '../models/dog_breed.dart';
 /// 外部 API に負荷をかけない値として 10 件にしている。
 const int kImagesPerRequest = 10;
 
+/// Cataas に要求する画像の縦幅（px）
+///
+/// カード画像は `BoxFit.cover` のポートレートなペイン（縦長）に表示される。
+/// cover はペインを覆うまで拡大してからクロップするため、横長の画像では
+/// 「幅」ではなく「高さ」が拡大率を決める側になる。横幅だけを指定すると、
+/// 横長画像で高さが足りずアップスケールされ画質が劣化する（#7 で判明）。
+///
+/// 800（論理 px、ペインの縦幅の目安）× DPR 2 = 1600 とし、DPR 2 の端末
+/// までは十分な余裕を持たせている。DPR 3 以上の端末では多少
+/// アップスケールされることになるが、原寸（数千 px）を毎回転送するのに
+/// 比べれば転送量を大きく削減できるため、許容するトレードオフとしている
+/// （実端末での計測は #7 の残課題）。
+///
+/// 逆にペインより「幅が狭い」= 非常に縦長な画像では高さ基準でも
+/// アップスケールされ得るが、そのような極端な縦長画像は稀であり、
+/// 従来の横長画像より遥かに影響が小さいため許容する。
+const int kCatImageHeight = 1600;
+
 /// 1 種類の動物に対する「URL の組み立て」と「レスポンスのパース」をまとめたもの
 ///
 /// 以前は `ApiService._fetchImagesForType` の if / else-if と `_apiUrls` マップで
@@ -88,7 +106,10 @@ class CatSource extends AnimalSource {
       images.add(
         AnimalImage(
           id: id,
-          url: 'https://cataas.com/cat/$id',
+          // height 指定でサーバー側リサイズさせ、表示に不要な原寸画像の
+          // 転送を避ける（#7）。BoxFit.cover のポートレートペインなので
+          // 拡大率を決めるのは高さ側（kCatImageHeight のコメント参照）。
+          url: 'https://cataas.com/cat/$id?height=$kCatImageHeight',
           type: AnimalType.cat,
           source: 'Cat as a service',
         ),
@@ -106,6 +127,14 @@ class CatSource extends AnimalSource {
 /// だけで、**犬種を表すフィールドは存在しない**。したがって犬種名は
 /// 画像 URL から [DogBreed.fromImageUrl] で復元する。
 /// 復元できない URL は例外にせず「いぬ」へフォールバックする。
+///
+/// ## 画像サイズについて（#7）
+///
+/// Cataas とは異なり、Dog CEO は `images.dog.ceo` 上の静的ファイルを
+/// そのまま返すだけで、width/height によるリサイズ指定には対応していない。
+/// 存在しないクエリパラメータを付けても API 側で無視されるだけで実害は
+/// 少ないが、「対応していないパラメータを憶測で足す」実装を避けるため、
+/// 犬の画像 URL には手を加えない。
 class DogSource extends AnimalSource {
   /// 明示的に選択された犬種（#32 用）
   ///
