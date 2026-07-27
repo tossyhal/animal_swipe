@@ -67,7 +67,7 @@ class ApiService implements IApiService {
         if (jsonData['status'] == 'success') {
           final List<dynamic> messages = jsonData['message'];
           return messages
-              .map((item) => AnimalImage.fromJson({'url': item}, type))
+              .map((item) => AnimalImage.fromApiJson({'url': item}, type))
               .toList();
         } else {
           throw Exception('Dog API returned error');
@@ -85,7 +85,7 @@ class ApiService implements IApiService {
           .timeout(_requestTimeout);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body) as List<dynamic>;
-        return data.map((item) => AnimalImage.fromJson(item, type)).toList();
+        return data.map((item) => AnimalImage.fromApiJson(item, type)).toList();
       } else {
         throw Exception('Failed to load cat images');
       }

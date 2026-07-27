@@ -124,7 +124,11 @@ void main() {
 
     setUp(() {
       fakeNotifier = FakeAnimalImagesNotifier([
-        AnimalImage(id: '1', url: 'http://example.com/cat.jpg', type: 'cat'),
+        const AnimalImage(
+          id: '1',
+          url: 'http://example.com/cat.jpg',
+          type: 'cat',
+        ),
       ]);
       container = ProviderContainer(
         overrides: [
@@ -267,7 +271,7 @@ void main() {
           MaterialApp(
             home: Scaffold(
               body: SwipeCard(
-                image: AnimalImage(
+                image: const AnimalImage(
                   id: '1',
                   url: 'http://example.com/cat.jpg',
                   type: 'cat',
@@ -296,7 +300,7 @@ void main() {
           MaterialApp(
             home: Scaffold(
               body: SwipeCard(
-                image: AnimalImage(
+                image: const AnimalImage(
                   id: '1',
                   url: 'http://example.com/cat.jpg',
                   type: 'cat',

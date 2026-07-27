@@ -8,7 +8,7 @@ void main() {
   late AnimalImage testImage;
 
   setUp(() {
-    testImage = AnimalImage(
+    testImage = const AnimalImage(
       id: '1',
       url: 'http://example.com/cat.jpg',
       type: 'cat',

@@ -181,6 +181,11 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
       if (moreImages.isEmpty) return;
 
       final current = state.value ?? const <AnimalImage>[];
+      // 重複排除は「同じ画像を 2 回見せない」ためのもの。#18 で AnimalImage に
+      // == を実装したが、ここは URL の Set のままにしている。
+      // 全フィールド一致の == で判定すると、同じ画像でも description や source
+      // といった付随情報が違うだけで別物と見なされ、重複がすり抜ける。
+      // 「同じ画像か」の同一性は URL が担うため、判定軸としては URL の方が強い。
       final existingUrls = current.map((image) => image.url).toSet();
       state = AsyncValue.data([
         ...current,
