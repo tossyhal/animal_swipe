@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:animal_swipe/widgets/swipe_card.dart';
 import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 
 void main() {
   late AnimalImage testImage;
@@ -11,7 +12,7 @@ void main() {
     testImage = const AnimalImage(
       id: '1',
       url: 'http://example.com/cat.jpg',
-      type: 'cat',
+      type: AnimalType.cat,
       description: 'Test Cat',
       source: 'The Cat API',
     );

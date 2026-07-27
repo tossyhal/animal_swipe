@@ -1,33 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/animal_model.dart';
+import '../models/animal_type.dart';
 import '../services/api_service.dart';
 import '../services/prefs_service.dart';
 import '../utils/logger.dart';
 
 /// 選択された動物タイプを管理するプロバイダー
 final selectedAnimalTypesProvider =
-    NotifierProvider<SelectedAnimalTypesNotifier, List<String>>(
+    NotifierProvider<SelectedAnimalTypesNotifier, List<AnimalType>>(
       SelectedAnimalTypesNotifier.new,
     );
 
 /// 選択された動物タイプの [Notifier]
-class SelectedAnimalTypesNotifier extends Notifier<List<String>> {
+class SelectedAnimalTypesNotifier extends Notifier<List<AnimalType>> {
   // build() は依存の変化で再実行され、その都度この場で再代入される。
   // final にすると 2 回目の代入で LateInitializationError になるため late のみ。
   late PrefsService _prefsService;
 
   @override
-  List<String> build() {
+  List<AnimalType> build() {
     _prefsService = ref.watch(prefsServiceProvider);
     return _prefsService.getSelectedAnimalTypes();
   }
 
   /// 動物タイプの選択状態を更新し、ローカルに保存する
-  void selectType(String type, bool isSelected) {
-    // 空文字列や空白文字列は無視
-    if (type.trim().isEmpty) return;
-
+  ///
+  /// [AnimalType] になったため、空文字列や未知のタイプを弾く必要はない。
+  /// 存在しない動物を渡すことはコンパイル時に不可能になった。
+  void selectType(AnimalType type, bool isSelected) {
     if (isSelected && !state.contains(type)) {
       state = [...state, type];
     } else if (!isSelected && state.contains(type)) {
@@ -133,7 +134,7 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
 
   /// 画像を取得し直す（エラー画面の「もう一度試す」から呼ばれる）
   Future<void> reload() async {
-    final requestedTypes = List<String>.of(
+    final requestedTypes = List<AnimalType>.of(
       ref.read(selectedAnimalTypesProvider),
     );
     // 追加読み込みと同じ通し番号を共有し、どちらか新しい方だけが state を書く
@@ -166,7 +167,7 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
     if (selectedTypes.isEmpty) return;
     if (_isLoadingMore) return;
 
-    final requestedTypes = List<String>.of(selectedTypes);
+    final requestedTypes = List<AnimalType>.of(selectedTypes);
     final requestId = ++_loadMoreRequestId;
     _isLoadingMore = true;
 
@@ -201,7 +202,7 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
   }
 
   /// リクエスト時点の選択が現在も維持されているか
-  bool _sameTypes(List<String> requestedTypes) {
+  bool _sameTypes(List<AnimalType> requestedTypes) {
     final current = ref.read(selectedAnimalTypesProvider);
     if (current.length != requestedTypes.length) return false;
     for (var i = 0; i < current.length; i++) {

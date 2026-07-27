@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/animal_type.dart';
+
 /// [PrefsService] を提供するプロバイダー
 /// ※ProviderScopeで上書きする必要があります
 final prefsServiceProvider = Provider<PrefsService>((ref) {
@@ -24,17 +26,24 @@ class PrefsService {
   }
 
   /// ローカルストレージから選択済みの動物タイプリストを取得する
-  List<String> getSelectedAnimalTypes() {
-    return _prefs.getStringList(_selectedTypesKey) ?? [];
+  ///
+  /// 保存されているのは [AnimalType.id] の文字列。**未知の id は黙って捨てる。**
+  /// 過去のバージョンで保存された、あるいは将来追加される予定の動物
+  /// （例: `'bird'`）が残っていても起動に失敗させないため。
+  List<AnimalType> getSelectedAnimalTypes() {
+    final ids = _prefs.getStringList(_selectedTypesKey) ?? const <String>[];
+    return AnimalType.fromIds(ids);
   }
 
   /// 指定された動物タイプリストをローカルストレージに保存する
-  Future<void> saveSelectedAnimalTypes(List<String> types) async {
-    // 空文字列や空白文字列を除外し、重複を排除
-    final validTypes = types
-        .where((type) => type.trim().isNotEmpty)
-        .toSet()
-        .toList();
-    await _prefs.setStringList(_selectedTypesKey, validTypes);
+  ///
+  /// 列挙型になったため、空文字列や未知の値が入り込む余地はない。
+  /// 重複だけ排除して順序は維持する。
+  Future<void> saveSelectedAnimalTypes(List<AnimalType> types) async {
+    final ids = <String>[];
+    for (final type in types) {
+      if (!ids.contains(type.id)) ids.add(type.id);
+    }
+    await _prefs.setStringList(_selectedTypesKey, ids);
   }
 }

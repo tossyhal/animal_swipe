@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/services/api_service.dart'
     show IApiService, apiServiceProvider;
@@ -16,34 +17,34 @@ class FakeApiService implements IApiService {
   int callCount = 0;
 
   /// 直近に要求された動物タイプ
-  List<String>? lastRequestedTypes;
+  List<AnimalType>? lastRequestedTypes;
 
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) async {
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) async {
     callCount++;
-    lastRequestedTypes = List<String>.of(types);
+    lastRequestedTypes = List<AnimalType>.of(types);
     // 各動物タイプごとに1件のダミーデータを返す。
     // 追加読み込みで重複排除されないよう、呼び出し回数を URL に含める。
     return types.map((type) => _image(type, callCount)).toList();
   }
 }
 
-AnimalImage _image(String type, int seq) => AnimalImage(
-  id: '$type-$seq',
-  url: 'http://example.com/$type-$seq.jpg',
+AnimalImage _image(AnimalType type, int seq) => AnimalImage(
+  id: '${type.id}-$seq',
+  url: 'http://example.com/${type.id}-$seq.jpg',
   type: type,
 );
 
 /// 常に空リストを返す ApiService
 class EmptyApiService implements IApiService {
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) async => [];
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) async => [];
 }
 
 /// 常に例外を投げる ApiService
 class FailingApiService implements IApiService {
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) async =>
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) async =>
       throw Exception('network down');
 }
 
@@ -55,14 +56,14 @@ class DeferredApiService implements IApiService {
   int get pendingCount => _pending.length;
 
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) {
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) {
     final completer = Completer<List<AnimalImage>>();
     _pending.add(completer);
     return completer.future;
   }
 
   /// 保留中の最初のリクエストに、指定タイプの画像を1件ずつ返す
-  void completeFirstWith(List<String> types, {int seq = 1}) {
+  void completeFirstWith(List<AnimalType> types, {int seq = 1}) {
     _pending
         .removeAt(0)
         .complete(types.map((type) => _image(type, seq)).toList());
@@ -186,7 +187,7 @@ void main() {
 
       // 初回読み込みを完了させる（cat + dog）
       final initial = container.read(animalImagesProvider.future);
-      api.completeFirstWith(['cat', 'dog']);
+      api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
       await initial;
 
       // reload を開始（応答は保留）
@@ -195,18 +196,18 @@ void main() {
       // 応答前に dog を外す → 再 build で新しい初回読み込みが走る
       container
           .read(selectedAnimalTypesProvider.notifier)
-          .selectType('dog', false);
+          .selectType(AnimalType.dog, false);
       container.read(animalImagesProvider);
 
       // 古い選択に対する reload の応答をいま返す
-      api.completeFirstWith(['cat', 'dog'], seq: 2);
+      api.completeFirstWith([AnimalType.cat, AnimalType.dog], seq: 2);
       await reloading;
 
       // 新しい選択の読み込みを完了させる
-      api.completeFirstWith(['cat'], seq: 3);
+      api.completeFirstWith([AnimalType.cat], seq: 3);
       final images = await container.read(animalImagesProvider.future);
 
-      expect(images.map((i) => i.type), ['cat']);
+      expect(images.map((i) => i.type), [AnimalType.cat]);
     });
 
     // スワイプ完了は 250ms 遅れて通知されるため、その間に再取得が完了して
@@ -221,14 +222,14 @@ void main() {
       final notifier = container.read(animalImagesProvider.notifier);
 
       final initial = container.read(animalImagesProvider.future);
-      api.completeFirstWith(['cat', 'dog']);
+      api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
       await initial;
       // カード表示時点の世代を控える（画面がコールバックに持たせる値）
       final oldDeckToken = notifier.deckGeneration;
 
       // 再取得して山札を入れ替える。ただし先頭の画像は前回と同一 URL
       final reloading = notifier.reload();
-      api.completeFirstWith(['cat', 'dog']);
+      api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
       await reloading;
 
       final newDeck = container.read(animalImagesProvider).requireValue;
@@ -291,19 +292,24 @@ void main() {
         final container = createContainer(api);
 
         final before = await container.read(animalImagesProvider.future);
-        expect(before.map((i) => i.type), containsAll(['cat', 'dog']));
+        expect(
+          before.map((i) => i.type),
+          containsAll([AnimalType.cat, AnimalType.dog]),
+        );
 
         container
             .read(selectedAnimalTypesProvider.notifier)
-            .selectType('dog', false);
+            .selectType(AnimalType.dog, false);
 
         final after = await container.read(animalImagesProvider.future);
         expect(
           after.map((i) => i.type),
-          everyElement('cat'),
+          everyElement(AnimalType.cat),
           reason: '外した dog の画像は残らないこと',
         );
-        expect(api.lastRequestedTypes, ['cat'], reason: '新しい選択で取得し直すこと');
+        expect(api.lastRequestedTypes, [
+          AnimalType.cat,
+        ], reason: '新しい選択で取得し直すこと');
       });
 
       test('選択を追加した場合も取得し直す', () async {
@@ -319,10 +325,10 @@ void main() {
 
         container
             .read(selectedAnimalTypesProvider.notifier)
-            .selectType('dog', true);
+            .selectType(AnimalType.dog, true);
 
         final after = await container.read(animalImagesProvider.future);
-        expect(after.map((i) => i.type), ['cat', 'dog']);
+        expect(after.map((i) => i.type), [AnimalType.cat, AnimalType.dog]);
       });
 
       test('スワイプ画面が居ない間のトグルは取得を発生させない', () async {
@@ -337,9 +343,9 @@ void main() {
         addTearDown(container.dispose);
 
         final notifier = container.read(selectedAnimalTypesProvider.notifier);
-        notifier.selectType('dog', false);
-        notifier.selectType('dog', true);
-        notifier.selectType('cat', false);
+        notifier.selectType(AnimalType.dog, false);
+        notifier.selectType(AnimalType.dog, true);
+        notifier.selectType(AnimalType.cat, false);
         await Future<void>.delayed(Duration.zero);
 
         expect(api.callCount, 0, reason: 'StartScreen でのトグルは無駄な通信を発生させないこと');
@@ -370,11 +376,11 @@ void main() {
       // 選択を変更して animalImagesProvider の再 build を発生させる
       container
           .read(selectedAnimalTypesProvider.notifier)
-          .selectType('dog', false);
+          .selectType(AnimalType.dog, false);
 
       final images = await container.read(animalImagesProvider.future);
-      expect(images.map((i) => i.type), ['cat']);
-      expect(api.lastRequestedTypes, ['cat']);
+      expect(images.map((i) => i.type), [AnimalType.cat]);
+      expect(api.lastRequestedTypes, [AnimalType.cat]);
     });
 
     // 追加読み込みの応答が、選択変更後の state を汚染しないこと。
@@ -384,7 +390,7 @@ void main() {
 
       // 初回読み込みを完了させる（cat + dog）
       final initial = container.read(animalImagesProvider.future);
-      api.completeFirstWith(['cat', 'dog']);
+      api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
       expect((await initial).length, 2);
 
       // 追加読み込みを開始（まだ応答は返さない）
@@ -396,20 +402,20 @@ void main() {
       // 応答が返る前に dog を外す → animalImagesProvider が再 build される
       container
           .read(selectedAnimalTypesProvider.notifier)
-          .selectType('dog', false);
+          .selectType(AnimalType.dog, false);
       // 再 build を確定させる（新しい初回読み込みが発行される）
       container.read(animalImagesProvider);
 
       // 古い選択（cat + dog）に対する追加読み込みの応答をいま返す
-      api.completeFirstWith(['cat', 'dog'], seq: 2);
+      api.completeFirstWith([AnimalType.cat, AnimalType.dog], seq: 2);
       await more;
 
       // 新しい選択の初回読み込みを完了させる
-      api.completeFirstWith(['cat'], seq: 3);
+      api.completeFirstWith([AnimalType.cat], seq: 3);
       final images = await container.read(animalImagesProvider.future);
 
       // 古い応答は捨てられ、外したはずの dog が混ざらないこと
-      expect(images.map((i) => i.type), ['cat']);
+      expect(images.map((i) => i.type), [AnimalType.cat]);
     });
   });
 }
@@ -419,7 +425,7 @@ class _CountingFailingApiService implements IApiService {
   int callCount = 0;
 
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) async {
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) async {
     callCount++;
     throw Exception('network down');
   }
@@ -432,7 +438,7 @@ class _SwitchableApiService implements IApiService {
   _SwitchableApiService(this._shouldFail);
 
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) async {
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) async {
     if (_shouldFail()) throw Exception('network down');
     return types.map((type) => _image(type, 1)).toList();
   }

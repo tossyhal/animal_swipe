@@ -1,10 +1,13 @@
-import 'dart:convert';
-import 'dart:math';
 import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+
 import '../models/animal_model.dart';
+import '../models/animal_type.dart';
 import '../utils/logger.dart';
+import 'animal_source.dart';
 
 /// APIサービスを提供するプロバイダー
 /// テストでは [IApiService] の Fake で override できるよう、
@@ -13,32 +16,36 @@ final apiServiceProvider = Provider<IApiService>((ref) => ApiService());
 
 /// APIサービスのインターフェース
 abstract class IApiService {
-  Future<List<AnimalImage>> fetchImages(List<String> types);
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types);
 }
 
 /// APIサービスクラス
 /// 各種動物画像を取得するためのサービス
+///
+/// 動物ごとの URL 構築とパースは [AnimalSource] が持つ。このクラスの責務は
+/// 「複数ソースを並行に叩き、結果をまとめる」ことだけに絞っている。
 class ApiService implements IApiService {
   static const Duration _requestTimeout = Duration(seconds: 12);
 
-  /// APIのURLマッピング
-  /// 'cat' は cataas、'dog' は Dog API を使用
-  final Map<String, String> _apiUrls = {
-    'cat': 'https://cataas.com/api/cats', // パラメータは動的に付与
-    'dog': 'https://dog.ceo/api/breeds/image/random/10',
-  };
+  /// 乱数生成器
+  ///
+  /// 呼び出しのたびに `Random()` を作らないようフィールドで保持する。
+  /// テストではシードを固定した [Random] を渡して URL を決定的にできる。
+  final Random _random;
+
+  ApiService({Random? random}) : _random = random ?? Random();
 
   /// 指定された動物タイプの画像を取得し、全画像リストを返す
   /// 各動物タイプごとに画像を取得し、取得した画像をシャッフルして返す
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) async {
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) async {
     final uniqueTypes = types.toSet();
     final results = await Future.wait(
       uniqueTypes.map((type) async {
         try {
           return await _fetchImagesForType(type);
         } catch (e) {
-          AppLogger.error('Error fetching $type images', e);
+          AppLogger.error('Error fetching ${type.id} images', e);
           return <AnimalImage>[];
         }
       }),
@@ -46,51 +53,32 @@ class ApiService implements IApiService {
     final allImages = results.expand((images) => images).toList();
 
     // 画像リストをシャッフル
-    allImages.shuffle();
+    allImages.shuffle(_random);
     return allImages;
   }
 
-  /// 指定された動物タイプに対する画像を取得するプライベートメソッド
-  /// 対応するURLが存在しない場合は空のリストを返します。
-  Future<List<AnimalImage>> _fetchImagesForType(String type) async {
-    final url = _apiUrls[type];
-    if (url == null) {
-      // 対応するURLが定義されていない場合、空のリストを返す
-      return [];
+  /// 指定された動物タイプに対する画像を取得する
+  ///
+  /// 対応する [AnimalSource] が登録されていない場合は空のリストを返す。
+  Future<List<AnimalImage>> _fetchImagesForType(AnimalType type) async {
+    final source = AnimalSource.forType(type);
+    if (source == null) {
+      // 列挙子を足したのにソースを登録し忘れた場合。
+      // 画面を落とさず、他の動物だけで続行する。
+      AppLogger.warning('AnimalSource が未登録です: ${type.id}');
+      return const <AnimalImage>[];
     }
 
-    if (type == 'dog') {
-      // Dog API の場合：JSON構造が { "message": [ ... ], "status": "success" } になっているため、messageから取得
-      final response = await http.get(Uri.parse(url)).timeout(_requestTimeout);
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body) as Map<String, dynamic>;
-        if (jsonData['status'] == 'success') {
-          final List<dynamic> messages = jsonData['message'];
-          return messages
-              .map((item) => AnimalImage.fromApiJson({'url': item}, type))
-              .toList();
-        } else {
-          throw Exception('Dog API returned error');
-        }
-      } else {
-        throw Exception('Failed to load dog images');
-      }
-    } else if (type == 'cat') {
-      // 猫の場合：cataas APIはリスト形式で返すが、ランダムな画像を取得するためにskipパラメータをランダムに設定
-      // ここでは、適当に 0〜999 の間の値をskipに設定
-      final randomSkip = Random().nextInt(1000);
-      final catUrl = '$url?limit=10&skip=$randomSkip';
-      final response = await http
-          .get(Uri.parse(catUrl))
-          .timeout(_requestTimeout);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body) as List<dynamic>;
-        return data.map((item) => AnimalImage.fromApiJson(item, type)).toList();
-      } else {
-        throw Exception('Failed to load cat images');
-      }
-    } else {
-      return [];
+    final response = await http
+        .get(source.buildUri(_random))
+        .timeout(_requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to load ${type.id} images: HTTP ${response.statusCode}',
+      );
     }
+
+    return source.parseResponse(response.body);
   }
 }

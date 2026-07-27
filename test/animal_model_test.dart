@@ -1,12 +1,13 @@
 // test/animal_model_test.dart
 import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const base = AnimalImage(
     id: 'abc',
     url: 'https://example.com/abc.jpg',
-    type: 'cat',
+    type: AnimalType.cat,
     description: 'ふわふわ',
     source: 'Cat as a service',
   );
@@ -16,7 +17,7 @@ void main() {
       const other = AnimalImage(
         id: 'abc',
         url: 'https://example.com/abc.jpg',
-        type: 'cat',
+        type: AnimalType.cat,
         description: 'ふわふわ',
         source: 'Cat as a service',
       );
@@ -31,7 +32,7 @@ void main() {
         base == base.copyWith(url: 'https://example.com/xyz.jpg'),
         isFalse,
       );
-      expect(base == base.copyWith(type: 'dog'), isFalse);
+      expect(base == base.copyWith(type: AnimalType.dog), isFalse);
       expect(base == base.copyWith(description: 'もふもふ'), isFalse);
       expect(base == base.copyWith(source: 'Dog CEO'), isFalse);
     });
@@ -78,7 +79,7 @@ void main() {
       const minimal = AnimalImage(
         id: 'abc',
         url: 'https://example.com/abc.jpg',
-        type: 'dog',
+        type: AnimalType.dog,
       );
 
       final json = minimal.toJson();
@@ -119,33 +120,24 @@ void main() {
     });
   });
 
-  group('fromApiJson', () {
-    test('cat は id から URL を組み立てる', () {
-      final image = AnimalImage.fromApiJson(<String, dynamic>{
-        'id': 'c1',
-      }, 'cat');
-
-      expect(image.id, 'c1');
-      expect(image.url, 'https://cataas.com/cat/c1');
-      expect(image.type, 'cat');
+  group('type の JSON 表現', () {
+    // 列挙子名ではなく AnimalType.id を書き出すこと。
+    // 列挙子をリネームしても保存済みデータが読めなくならないため。
+    test('toJson は AnimalType.id を書き出す', () {
+      expect(base.toJson()['type'], 'cat');
+      expect(base.copyWith(type: AnimalType.dog).toJson()['type'], 'dog');
     });
 
-    test('dog は url をそのまま使う', () {
-      final image = AnimalImage.fromApiJson(<String, dynamic>{
-        'url': 'https://images.dog.ceo/breeds/hound/n02088094_1003.jpg',
-      }, 'dog');
-
+    // 選択タイプの復元（AnimalType.fromIds）は未知の id を黙って捨てるが、
+    // 画像 1 件は「どう表示するか」が決まらないため復元できない。
+    test('未知の動物タイプは FormatException', () {
       expect(
-        image.url,
-        'https://images.dog.ceo/breeds/hound/n02088094_1003.jpg',
-      );
-      expect(image.type, 'dog');
-    });
-
-    test('未対応のタイプは例外', () {
-      expect(
-        () => AnimalImage.fromApiJson(<String, dynamic>{}, 'bird'),
-        throwsA(isA<Exception>()),
+        () => AnimalImage.fromJson(<String, dynamic>{
+          'id': 'b1',
+          'url': 'https://example.com/b1.jpg',
+          'type': 'bird',
+        }),
+        throwsFormatException,
       );
     });
   });

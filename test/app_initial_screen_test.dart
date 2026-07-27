@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:animal_swipe/main.dart';
 import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
 import 'package:animal_swipe/screens/swipe_screen.dart';
 import 'package:animal_swipe/services/api_service.dart';
@@ -16,7 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 初期画面の判定だけを見たいので、通信は保留したままにする。
 class _NeverCompletingApiService implements IApiService {
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) =>
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) =>
       Completer<List<AnimalImage>>().future;
 }
 

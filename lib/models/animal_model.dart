@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'animal_type.dart';
+
 /// 動物画像データを保持するモデルクラス
 ///
 /// 値オブジェクトとして扱う。同じ内容なら同じものとみなせるよう
@@ -22,7 +24,7 @@ class AnimalImage {
   final String url;
 
   /// 動物の種類
-  final String type;
+  final AnimalType type;
 
   /// 画像の説明（任意）
   final String? description;
@@ -51,7 +53,7 @@ class AnimalImage {
   AnimalImage copyWith({
     String? id,
     String? url,
-    String? type,
+    AnimalType? type,
     Object? description = _unset,
     Object? source = _unset,
   }) {
@@ -73,7 +75,8 @@ class AnimalImage {
     return <String, dynamic>{
       'id': id,
       'url': url,
-      'type': type,
+      // 列挙子の名前ではなく安定した id を書き出す
+      'type': type.id,
       'description': description,
       'source': source,
     };
@@ -87,11 +90,21 @@ class AnimalImage {
   /// 必須フィールドが欠けている・型が違う場合は [FormatException] を投げる。
   /// 保存データの破損を黙って空文字で埋めると、URL が空の画像が
   /// 一覧に紛れ込んで原因が追いにくくなるため。
+  ///
+  /// `type` が未知の動物 id だった場合も [FormatException] を投げる。
+  /// 選択タイプの復元（[AnimalType.fromIds]）は未知の値を黙って捨てるが、
+  /// こちらは「画像 1 件をどう表示するか」が決まらないため復元できない。
   factory AnimalImage.fromJson(Map<String, dynamic> json) {
+    final typeId = _requireString(json, 'type');
+    final type = AnimalType.fromId(typeId);
+    if (type == null) {
+      throw FormatException('AnimalImage.fromJson: 未知の動物タイプ "$typeId"');
+    }
+
     return AnimalImage(
       id: _requireString(json, 'id'),
       url: _requireString(json, 'url'),
-      type: _requireString(json, 'type'),
+      type: type,
       description: _optionalString(json, 'description'),
       source: _optionalString(json, 'source'),
     );
@@ -114,37 +127,9 @@ class AnimalImage {
     );
   }
 
-  /// APIレスポンスから[AnimalImage]オブジェクトを生成するファクトリコンストラクタ
-  ///
-  /// [json]：APIから取得したJSONデータ
-  /// [type]：動物の種類（'cat'、'dog'）
-  ///
-  /// NOTE: この型別分岐は #15 で `AnimalSource` 側へ移し、ここからは削除する。
-  factory AnimalImage.fromApiJson(Map<String, dynamic> json, String type) {
-    if (type == 'cat') {
-      // The Cat API のパースロジック
-      return AnimalImage(
-        id: json['id'] ?? '',
-        url: 'https://cataas.com/cat/${json['id']}',
-        type: 'cat',
-        source: 'Cat as a service',
-      );
-    } else if (type == 'dog') {
-      // The Dog API のパースロジック
-      final url = json['url'] as String? ?? '';
-      return AnimalImage(
-        id: json['id'] as String? ?? url,
-        url: url,
-        type: 'dog',
-        description: json['breeds']?.isNotEmpty == true
-            ? json['breeds'][0]['name']
-            : null,
-        source: 'The Dog API',
-      );
-    } else {
-      throw Exception('Unsupported animal type: $type');
-    }
-  }
+  // NOTE: API レスポンスの型別パース（旧 fromApiJson）は #15 で
+  // `lib/services/animal_source.dart` の各 [AnimalSource] へ移した。
+  // モデルは外部 API の形式を知らない。
 
   @override
   bool operator ==(Object other) {

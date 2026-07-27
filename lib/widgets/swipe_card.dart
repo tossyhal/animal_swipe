@@ -321,7 +321,9 @@ class _SwipeCardState extends State<SwipeCard>
                                       ),
                                     ),
                                     child: Text(
-                                      widget.image.type.toUpperCase(),
+                                      // 表示は従来どおり英字大文字（CAT / DOG）。
+                                      // 列挙子名ではなく安定した id を使う。
+                                      widget.image.type.id.toUpperCase(),
                                       style: TextStyle(
                                         fontSize: AppSizes.font14,
                                         fontWeight: FontWeight.w500,

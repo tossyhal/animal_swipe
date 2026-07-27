@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animal_swipe/screens/swipe_screen.dart';
 import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/services/api_service.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
@@ -88,7 +89,7 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   AnimalImage _additionalImage() => AnimalImage(
     id: 'additional_$_loadMoreCallCount',
     url: 'http://example.com/additional_$_loadMoreCallCount.jpg',
-    type: _loadMoreCallCount % 2 == 0 ? 'cat' : 'dog',
+    type: _loadMoreCallCount % 2 == 0 ? AnimalType.cat : AnimalType.dog,
   );
 
   void setSimulateError(bool shouldError) {
@@ -103,16 +104,20 @@ class _DeferredApiService implements IApiService {
   final _pending = <Completer<List<AnimalImage>>>[];
 
   @override
-  Future<List<AnimalImage>> fetchImages(List<String> types) {
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) {
     final completer = Completer<List<AnimalImage>>();
     _pending.add(completer);
     return completer.future;
   }
 
-  void completeFirstWith(List<String> types) {
+  void completeFirstWith(List<AnimalType> types) {
     _pending.removeAt(0).complete([
       for (final type in types)
-        AnimalImage(id: type, url: 'http://example.com/$type.jpg', type: type),
+        AnimalImage(
+          id: type.id,
+          url: 'http://example.com/${type.id}.jpg',
+          type: type,
+        ),
     ]);
   }
 }
@@ -127,7 +132,7 @@ void main() {
         const AnimalImage(
           id: '1',
           url: 'http://example.com/cat.jpg',
-          type: 'cat',
+          type: AnimalType.cat,
         ),
       ]);
       container = ProviderContainer(
@@ -274,7 +279,7 @@ void main() {
                 image: const AnimalImage(
                   id: '1',
                   url: 'http://example.com/cat.jpg',
-                  type: 'cat',
+                  type: AnimalType.cat,
                 ),
                 onSwipeLeft: () {
                   onSwipeLeftCalled = true;
@@ -303,7 +308,7 @@ void main() {
                 image: const AnimalImage(
                   id: '1',
                   url: 'http://example.com/cat.jpg',
-                  type: 'cat',
+                  type: AnimalType.cat,
                 ),
                 onSwipeLeft: () {},
                 onSwipeRight: () {
@@ -378,7 +383,7 @@ void main() {
         );
 
         // 初回取得を完了させる
-        api.completeFirstWith(['cat', 'dog']);
+        api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.byType(SwipeCard), findsOneWidget);
@@ -396,7 +401,7 @@ void main() {
         // AsyncLoading になる
         realContainer
             .read(selectedAnimalTypesProvider.notifier)
-            .selectType('dog', false);
+            .selectType(AnimalType.dog, false);
         await tester.pump();
 
         // ボタンの無効化はフレーム単位で即座に反映される

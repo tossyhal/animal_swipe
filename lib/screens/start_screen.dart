@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
+import '../models/animal_type.dart';
 import '../providers/animal_providers.dart';
 import '../theme/theme_extensions.dart';
 import '../widgets/common/gradient_background.dart';
@@ -11,20 +12,9 @@ import 'swipe_screen.dart';
 class StartScreen extends ConsumerWidget {
   const StartScreen({super.key});
 
-  static const _animalTypes = [
-    (
-      id: 'cat',
-      name: AppStrings.animalCat,
-      description: AppStrings.animalCatDescription,
-      emoji: AppStrings.animalCatEmoji,
-    ),
-    (
-      id: 'dog',
-      name: AppStrings.animalDog,
-      description: AppStrings.animalDogDescription,
-      emoji: AppStrings.animalDogEmoji,
-    ),
-  ];
+  // 選択肢は [AnimalType] から導出する。表示名・説明・絵文字も列挙型が
+  // 持っているため、動物を増やしてもこの画面に手を入れる必要はない。
+  static const List<AnimalType> _animalTypes = AnimalType.values;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -168,8 +158,8 @@ class _BrandHeader extends StatelessWidget {
 }
 
 class _SelectionPanel extends StatelessWidget {
-  final List<String> selectedTypes;
-  final void Function(String type, bool isSelected) onToggle;
+  final List<AnimalType> selectedTypes;
+  final void Function(AnimalType type, bool isSelected) onToggle;
   final VoidCallback? onStart;
 
   const _SelectionPanel({
@@ -224,13 +214,13 @@ class _SelectionPanel extends StatelessWidget {
               itemCount: StartScreen._animalTypes.length,
               itemBuilder: (context, index) {
                 final type = StartScreen._animalTypes[index];
-                final isSelected = selectedTypes.contains(type.id);
+                final isSelected = selectedTypes.contains(type);
                 return _AnimalChoice(
-                  name: type.name,
+                  name: type.label,
                   description: type.description,
                   emoji: type.emoji,
                   isSelected: isSelected,
-                  onTap: () => onToggle(type.id, !isSelected),
+                  onTap: () => onToggle(type, !isSelected),
                 );
               },
             ),

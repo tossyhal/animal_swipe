@@ -1,8 +1,9 @@
 // test/animal_providers_test.dart
-import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -34,25 +35,25 @@ void main() {
 
       test('動物タイプを追加すると、リストに追加されること', () {
         final notifier = container.read(selectedAnimalTypesProvider.notifier);
-        notifier.selectType('cat', true);
+        notifier.selectType(AnimalType.cat, true);
         expect(container.read(selectedAnimalTypesProvider), [
-          'cat',
+          AnimalType.cat,
         ], reason: '猫が正しく追加されていること');
       });
 
       test('動物タイプを削除すると、リストから削除されること', () {
         final notifier = container.read(selectedAnimalTypesProvider.notifier);
         // 準備：まず動物を追加
-        notifier.selectType('dog', true);
-        notifier.selectType('cat', true);
+        notifier.selectType(AnimalType.dog, true);
+        notifier.selectType(AnimalType.cat, true);
 
         // 実行：猫を削除
-        notifier.selectType('cat', false);
+        notifier.selectType(AnimalType.cat, false);
 
         // 検証
         expect(
           container.read(selectedAnimalTypesProvider),
-          ['dog'],
+          [AnimalType.dog],
           reason: '猫が正しく削除され、犬のみが残っていること',
         );
       });
@@ -61,32 +62,37 @@ void main() {
     group('エッジケースのテスト', () {
       test('同じ動物タイプを複数回追加しても、1回だけ追加されること', () {
         final notifier = container.read(selectedAnimalTypesProvider.notifier);
-        notifier.selectType('cat', true);
-        notifier.selectType('cat', true);
-        notifier.selectType('cat', true);
+        notifier.selectType(AnimalType.cat, true);
+        notifier.selectType(AnimalType.cat, true);
+        notifier.selectType(AnimalType.cat, true);
 
         expect(container.read(selectedAnimalTypesProvider), [
-          'cat',
+          AnimalType.cat,
         ], reason: '重複した追加を防止できていること');
       });
 
-      test('存在しない動物タイプを削除しても、エラーが発生しないこと', () {
+      test('選択されていない動物タイプを削除しても、エラーが発生しないこと', () {
         final notifier = container.read(selectedAnimalTypesProvider.notifier);
         // 実行時にエラーが発生しないことを確認
         expect(
-          () => notifier.selectType('nonexistent', false),
+          () => notifier.selectType(AnimalType.dog, false),
           returnsNormally,
         );
       });
 
-      test('空文字列の動物タイプは追加されないこと', () {
+      // #15 以前は空文字列や 'nonexistent' を弾くランタイム検証が必要だったが、
+      // AnimalType になったことで「存在しない動物タイプ」はそもそも渡せない。
+      // 検証はランタイムから型システムへ移った。
+      test('選択肢は AnimalType.values に限られる', () {
         final notifier = container.read(selectedAnimalTypesProvider.notifier);
-        notifier.selectType('', true);
+        for (final type in AnimalType.values) {
+          notifier.selectType(type, true);
+        }
 
         expect(
           container.read(selectedAnimalTypesProvider),
-          isEmpty,
-          reason: '空文字列は無視されること',
+          AnimalType.values,
+          reason: '全ての動物タイプを選択できること',
         );
       });
     });
@@ -94,10 +100,10 @@ void main() {
     group('永続化のテスト', () {
       test('選択した動物タイプがSharedPreferencesに保存されること', () async {
         final notifier = container.read(selectedAnimalTypesProvider.notifier);
-        notifier.selectType('cat', true);
-        notifier.selectType('dog', true);
+        notifier.selectType(AnimalType.cat, true);
+        notifier.selectType(AnimalType.dog, true);
 
-        // SharedPreferencesに保存されていることを確認
+        // SharedPreferences には AnimalType.id の文字列で保存される
         final savedTypes = prefs.getStringList('selected_animal_types');
         expect(savedTypes, ['cat', 'dog'], reason: '選択した動物タイプが正しく保存されていること');
       });
@@ -112,15 +118,38 @@ void main() {
             prefsServiceProvider.overrideWithValue(PrefsService(prefs)),
           ],
         );
+        addTearDown(newContainer.dispose);
 
         // 保存されていたデータが復元されていることを確認
         expect(
           newContainer.read(selectedAnimalTypesProvider),
-          ['cat', 'dog'],
+          [AnimalType.cat, AnimalType.dog],
           reason: '保存されていた動物タイプが正しく復元されること',
         );
+      });
 
-        newContainer.dispose();
+      // 端末に残った古い選択（あるいは将来追加予定の動物）で
+      // 起動に失敗させないこと。
+      test('保存済みデータに未知の動物 id が混ざっていても無視される', () async {
+        await prefs.setStringList('selected_animal_types', [
+          'cat',
+          'bird',
+          'dog',
+          '',
+        ]);
+
+        final newContainer = ProviderContainer(
+          overrides: [
+            prefsServiceProvider.overrideWithValue(PrefsService(prefs)),
+          ],
+        );
+        addTearDown(newContainer.dispose);
+
+        expect(
+          newContainer.read(selectedAnimalTypesProvider),
+          [AnimalType.cat, AnimalType.dog],
+          reason: '未知の id は落とし、既知のものだけを復元すること',
+        );
       });
     });
   });
