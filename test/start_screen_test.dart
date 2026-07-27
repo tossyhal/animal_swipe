@@ -1,11 +1,27 @@
 // test/start_screen_test.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:animal_swipe/services/api_service.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
 import 'package:animal_swipe/screens/swipe_screen.dart';
+
+/// 応答を返さない ApiService。
+///
+/// このテストは StartScreen 側の挙動だけを見たいので、SwipeScreen へ
+/// 遷移した先で実 ApiService が起動し外部 HTTP へ接続してしまわないよう、
+/// 常に保留したままにする Fake で確実に上書きする。
+class _NeverCompletingApiService implements IApiService {
+  @override
+  Future<List<AnimalImage>> fetchImages(List<AnimalType> types) =>
+      Completer<List<AnimalImage>>().future;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +36,10 @@ void main() {
       prefs = await SharedPreferences.getInstance();
       prefsService = PrefsService(prefs);
       container = ProviderContainer(
-        overrides: [prefsServiceProvider.overrideWithValue(prefsService)],
+        overrides: [
+          prefsServiceProvider.overrideWithValue(prefsService),
+          apiServiceProvider.overrideWithValue(_NeverCompletingApiService()),
+        ],
       );
     });
 
