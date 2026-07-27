@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/app_dimensions.dart';
@@ -63,9 +64,13 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
   /// 通知されるため、その間に山札が入れ替わっていないかを Notifier に照合させる。
   void _skip(int deckToken, AnimalImage swipedImage) {
     if (_isRefreshing) return;
-    ref
+    final removed = ref
         .read(animalImagesProvider.notifier)
         .removeTopImage(deckToken: deckToken, expectedTop: swipedImage);
+    // 実際にスワイプが確定した（古い山札への操作として無視されていない）
+    // 場合のみ鳴らす。HapticFeedback は Web では単なる no-op として無視
+    // されるだけなので、kIsWeb によるプラットフォーム分岐は不要（#24）。
+    if (removed) unawaited(HapticFeedback.lightImpact());
   }
 
   /// [swipedImage] は「実際にスワイプされたカード」そのもの。
@@ -79,14 +84,44 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
   /// 見ていない画像がお気に入りに入る事故を防ぐ。
   void _like(int deckToken, AnimalImage swipedImage) {
     if (_isRefreshing) return;
+    // Undo でお気に入りを取り消すべきかは、このスワイプが実際に新規追加
+    // したかどうかで決める。既にお気に入り済みの画像を再度「好き」しても
+    // favoritesProvider.add は何もしないため、その場合に Undo で
+    // お気に入りを消すと、このスワイプより前からのお気に入りを
+    // 誤って消してしまう（#9）。
+    final alreadyFavorite = ref
+        .read(favoritesProvider.notifier)
+        .isFavorite(swipedImage);
     final removed = ref
         .read(animalImagesProvider.notifier)
-        .removeTopImage(deckToken: deckToken, expectedTop: swipedImage);
+        .removeTopImage(
+          deckToken: deckToken,
+          expectedTop: swipedImage,
+          undoRemovesFavorite: !alreadyFavorite,
+        );
     // 古い操作で山札が変化しなかった場合は「好き」の通知もお気に入り登録もしない
     if (removed) {
       ref.read(favoritesProvider.notifier).add(swipedImage);
       _showLikedMessage();
+      // Like は Skip よりわずかに強めのフィードバックにする（#24）。
+      // Web では no-op になるだけなのでプラットフォーム分岐は不要。
+      unawaited(HapticFeedback.mediumImpact());
     }
+  }
+
+  /// 直前の 1 枚を戻す（Undo, #9）。
+  ///
+  /// スワイプ確定と違い、ユーザーが誤操作を取り消すための操作なので、
+  /// 「戻った」ことが分かる程度の軽いフィードバックに留める
+  /// （Like ほど強くしない）。戻せる履歴がない場合は Notifier 側で
+  /// 何もせず null を返すので、ここでも何も鳴らさない。
+  void _undo() {
+    final result = ref.read(animalImagesProvider.notifier).undo();
+    if (result == null) return;
+    if (result.shouldUnfavorite) {
+      ref.read(favoritesProvider.notifier).remove(result.image);
+    }
+    unawaited(HapticFeedback.lightImpact());
   }
 
   /// 画面に描画中のスタック（先頭 3 枚）よりさらに先の画像を、
@@ -161,6 +196,10 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
         !imagesAsync.isLoading && (imagesAsync.value?.isNotEmpty ?? false);
     // 表示中の山札の世代。カード操作にこれを持ち回らせる
     final deckToken = ref.read(animalImagesProvider.notifier).deckGeneration;
+    // Undo できる履歴があるか。imagesAsync を watch しているこの build() は
+    // removeTopImage/undo が state を更新するたびに再実行されるので、
+    // ここで都度読み直せば最新の状態に追従する（deckToken と同じ考え方）。
+    final canUndo = ref.read(animalImagesProvider.notifier).canUndo;
     // AppBar / GradientBackground はどちらも primary ベースなので前景は onPrimary
     final onGradient = context.colors.onPrimary;
 
@@ -284,6 +323,14 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ActionButton(
+                      onPressed: canUndo ? _undo : null,
+                      icon: Icons.undo,
+                      backgroundColor: context.colors.tertiary,
+                      foregroundColor: context.colors.onTertiary,
+                      label: AppStrings.undo,
+                    ),
+                    const SizedBox(width: AppSpacing.s24),
+                    ActionButton(
                       // ボタン経由でも、押した瞬間の先頭カードを固定して渡す
                       onPressed: hasImage
                           ? () {
@@ -296,7 +343,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                       foregroundColor: context.colors.onError,
                       label: AppStrings.skip,
                     ),
-                    const SizedBox(width: AppSpacing.s44),
+                    const SizedBox(width: AppSpacing.s24),
                     ActionButton(
                       // ボタン経由でも、押した瞬間の先頭カードを固定して渡す
                       onPressed: hasImage

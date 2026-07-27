@@ -2,9 +2,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animal_swipe/screens/swipe_screen.dart';
@@ -74,7 +74,11 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   }
 
   @override
-  bool removeTopImage({int? deckToken, AnimalImage? expectedTop}) {
+  bool removeTopImage({
+    int? deckToken,
+    AnimalImage? expectedTop,
+    bool undoRemovesFavorite = false,
+  }) {
     final current = state.value ?? const <AnimalImage>[];
     if (current.isEmpty) return false;
     if (deckToken != null && deckToken != deckGeneration) return false;
@@ -1049,6 +1053,277 @@ void main() {
         // 再取得が終わっていない間は、カードスタックではなくローディング表示
         expect(find.byType(SwipeCard), findsNothing, reason: 'ローディング表示に変わる');
         expect(find.text(AppStrings.loading), findsOneWidget);
+      });
+    });
+
+    // FakeAnimalImagesNotifier は removeTopImage を丸ごと上書きしており、
+    // 基底クラス（AnimalImagesNotifier）が private に持つ Undo 履歴フィールドは
+    // 更新されない。そのため Undo の実挙動を確かめるテストは、実装の
+    // Notifier を使う（再取得中の挙動テストと同じ理由）。
+    group('Undo テスト（実 Provider, #9）', () {
+      InkWell undoButton(WidgetTester tester) => tester.widget<InkWell>(
+        find.ancestor(
+          of: find.byIcon(Icons.undo),
+          matching: find.byType(InkWell),
+        ),
+      );
+
+      testWidgets('履歴がない間、Undo ボタンは disabled であること', (tester) async {
+        SharedPreferences.setMockInitialValues({
+          'selected_animal_types': ['cat'],
+        });
+        final prefs = PrefsService(await SharedPreferences.getInstance());
+        final api = _DeferredApiService();
+        final realContainer = ProviderContainer(
+          overrides: [
+            prefsServiceProvider.overrideWithValue(prefs),
+            apiServiceProvider.overrideWithValue(api),
+          ],
+        );
+        addTearDown(realContainer.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: realContainer,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+
+        api.completeFirstWith([AnimalType.cat]);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(undoButton(tester).onTap, isNull, reason: 'まだ何もスワイプしていない');
+      });
+
+      testWidgets('スキップ確定後、Undo ボタンが有効になりカードが復元されること', (tester) async {
+        // Undo にも軽いフィードバックを付けている（#24）。誤操作を戻す操作
+        // であって「好き」ほど強く鳴らす理由はないため lightImpact を使う。
+        final hapticCalls = <MethodCall>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+              if (call.method == 'HapticFeedback.vibrate') {
+                hapticCalls.add(call);
+              }
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.platform, null);
+        });
+
+        SharedPreferences.setMockInitialValues({
+          'selected_animal_types': ['cat'],
+        });
+        final prefs = PrefsService(await SharedPreferences.getInstance());
+        final api = _DeferredApiService();
+        final realContainer = ProviderContainer(
+          overrides: [
+            prefsServiceProvider.overrideWithValue(prefs),
+            apiServiceProvider.overrideWithValue(api),
+          ],
+        );
+        addTearDown(realContainer.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: realContainer,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+
+        api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        final removedInstance = realContainer
+            .read(animalImagesProvider)
+            .value!
+            .first;
+
+        expect(undoButton(tester).onTap, isNull);
+
+        await tester.tap(find.byIcon(Icons.close));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(
+          undoButton(tester).onTap,
+          isNotNull,
+          reason: 'スキップ確定後は直前の1枚を戻せるはず',
+        );
+
+        await tester.tap(find.byIcon(Icons.undo));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(
+          identical(
+            realContainer.read(animalImagesProvider).value!.first,
+            removedInstance,
+          ),
+          isTrue,
+          reason: 'Undo は取り除いたカードと同一インスタンスを先頭へ戻すべき',
+        );
+        expect(
+          undoButton(tester).onTap,
+          isNull,
+          reason: '戻した直後は履歴が消費されるので再び disabled になる',
+        );
+        expect(
+          hapticCalls.map((c) => c.arguments),
+          containsAllInOrder(<String>[
+            'HapticFeedbackType.lightImpact', // スキップ確定
+            'HapticFeedbackType.lightImpact', // Undo
+          ]),
+          reason: 'Undo にも Skip と同じ軽さのフィードバックを付けている',
+        );
+      });
+
+      testWidgets('「好き」からの Undo はお気に入りも取り消すこと', (tester) async {
+        SharedPreferences.setMockInitialValues({
+          'selected_animal_types': ['cat'],
+        });
+        final prefs = PrefsService(await SharedPreferences.getInstance());
+        final api = _DeferredApiService();
+        final realContainer = ProviderContainer(
+          overrides: [
+            prefsServiceProvider.overrideWithValue(prefs),
+            apiServiceProvider.overrideWithValue(api),
+          ],
+        );
+        addTearDown(realContainer.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: realContainer,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+
+        api.completeFirstWith([AnimalType.cat, AnimalType.dog]);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        final liked = realContainer.read(animalImagesProvider).value!.first;
+
+        await tester.tap(find.byIcon(Icons.favorite));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(realContainer.read(favoritesProvider), [liked]);
+
+        // 「好き」で出た SnackBar（floating）がボタン行に重なり、Undo への
+        // タップがヒットテストで弾かれてしまうため、先に消しておく
+        tester
+            .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+            .hideCurrentSnackBar();
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.undo));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(
+          realContainer.read(favoritesProvider),
+          isEmpty,
+          reason: 'Undo でこのスワイプが追加したお気に入りは取り消されるべき',
+        );
+        expect(
+          identical(
+            realContainer.read(animalImagesProvider).value!.first,
+            liked,
+          ),
+          isTrue,
+        );
+      });
+    });
+
+    group('触覚フィードバックテスト（#24）', () {
+      final List<MethodCall> hapticCalls = <MethodCall>[];
+
+      void captureHaptics() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+              if (call.method == 'HapticFeedback.vibrate') {
+                hapticCalls.add(call);
+              }
+              return null;
+            });
+      }
+
+      setUp(() {
+        hapticCalls.clear();
+        captureHaptics();
+      });
+
+      tearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      testWidgets('スキップ確定時に lightImpact が鳴ること', (tester) async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        await tester.tap(find.byIcon(Icons.close));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(hapticCalls, hasLength(1));
+        expect(hapticCalls.single.arguments, 'HapticFeedbackType.lightImpact');
+      });
+
+      testWidgets('Like 確定時に skip より強い mediumImpact が鳴ること', (tester) async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        await tester.tap(find.byIcon(Icons.favorite));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(hapticCalls, hasLength(1));
+        expect(hapticCalls.single.arguments, 'HapticFeedbackType.mediumImpact');
+      });
+
+      testWidgets('操作対象がない（disabled）ボタンをタップしても鳴らないこと', (tester) async {
+        fakeNotifier = FakeAnimalImagesNotifier([]);
+        container = ProviderContainer(
+          overrides: [
+            animalImagesProvider.overrideWith(() => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.close));
+        await tester.pump();
+        await tester.tap(find.byIcon(Icons.favorite));
+        await tester.pump();
+        await tester.tap(find.byIcon(Icons.undo));
+        await tester.pump();
+
+        expect(hapticCalls, isEmpty);
       });
     });
   });

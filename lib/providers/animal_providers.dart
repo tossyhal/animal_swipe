@@ -107,6 +107,42 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
 
   int get deckGeneration => _deckGeneration;
 
+  /// Undo 用に保持する「直前に取り除いた 1 枚」（#9）。
+  ///
+  /// 深さ 1（スタックにしない）でよいと判断した。issue の要求は
+  /// 「直前の1枚」を戻せることであり、複数手前まで遡る Undo は
+  /// 求められていない。スタックにすると、山札の世代管理やお気に入り
+  /// 取消判定（[_lastRemovedShouldUnfavorite]）を要素数分やり取りする
+  /// 必要が出るが、それに見合うだけの要求がないため、単一の直前カードを
+  /// 保持するだけに留めている。
+  AnimalImage? _lastRemoved;
+
+  /// [_lastRemoved] を取り除いた時点の [_deckGeneration]。
+  ///
+  /// build() で山札が入れ替わると世代が変わる。Undo 時にここが現在の
+  /// [_deckGeneration] と一致しなければ、そのカードは「もう存在しない
+  /// 山札」の要素であり、今の山札の先頭に戻すことはできない
+  /// （removeTopImage の deckToken 照合と同じ理由）。
+  int? _lastRemovedDeckToken;
+
+  /// この除去が「好き」によるもので、かつそのスワイプが実際に
+  /// お気に入りを新規追加したか。
+  ///
+  /// 既にお気に入り登録済みの画像を再度「好き」した場合、
+  /// favoritesProvider.add は何もしない（重複追加しない）ため、
+  /// その場合に Undo でお気に入りを消すと、このスワイプより前からの
+  /// お気に入りを誤って消してしまう。呼び出し側（SwipeScreen）が
+  /// スワイプ直前に isFavorite を見て判定し、ここへ渡す。
+  bool _lastRemovedShouldUnfavorite = false;
+
+  /// 直前の 1 枚を Undo で戻せる状態か。
+  ///
+  /// 再取得中は戻す先の山札自体が確定していないため false。
+  bool get canUndo =>
+      !state.isLoading &&
+      _lastRemoved != null &&
+      _lastRemovedDeckToken == _deckGeneration;
+
   @override
   Future<List<AnimalImage>> build() async {
     final apiService = ref.watch(apiServiceProvider);
@@ -118,7 +154,12 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
     // 古い選択に紐づくものなので無効化する
     _loadMoreRequestId++;
     _isLoadingMore = false;
-    // ここから作られるのは新しい山札
+    // ここから作られるのは新しい山札。古い山札に紐づく Undo 履歴は
+    // 戻す先を失うので破棄する（[canUndo] は世代不一致でも false になるが、
+    // ぶら下がった参照とお気に入り取消フラグを残さないよう明示的に消す）。
+    _lastRemoved = null;
+    _lastRemovedDeckToken = null;
+    _lastRemovedShouldUnfavorite = false;
     _deckGeneration = ++_nextDeckToken;
 
     if (selectedTypes.isEmpty) return const [];
@@ -156,7 +197,12 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
     if (requestId != _loadMoreRequestId) return;
     if (!_sameTypes(requestedTypes)) return;
 
-    // 取り直した結果は別の山札
+    // 取り直した結果は別の山札。build() と同じ理由で Undo 履歴も破棄する
+    // （世代不一致で canUndo は自然に false になるが、ぶら下がった参照と
+    // お気に入り取消フラグを残さないために明示的に消す）。
+    _lastRemoved = null;
+    _lastRemovedDeckToken = null;
+    _lastRemovedShouldUnfavorite = false;
     _deckGeneration = ++_nextDeckToken;
     state = result;
   }
@@ -226,8 +272,16 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
   /// 次のカードを黙って捨ててしまう**。先頭が期待どおりかを
   /// ここで照合することで、判定と除去を不可分にする。
   ///
+  /// [undoRemovesFavorite] には、この除去が「好き」によるもので、かつ
+  /// そのスワイプが実際にお気に入りを新規追加した場合に true を渡す
+  /// （判定は呼び出し側の責務。理由は [_lastRemovedShouldUnfavorite] 参照）。
+  ///
   /// 実際に取り除いた場合のみ true を返す。
-  bool removeTopImage({int? deckToken, AnimalImage? expectedTop}) {
+  bool removeTopImage({
+    int? deckToken,
+    AnimalImage? expectedTop,
+    bool undoRemovesFavorite = false,
+  }) {
     // 再取得中は前回の山札が state に残っているが、それはもう表示対象ではない
     if (state.isLoading) return false;
     // 表示時と別の山札に入れ替わっているなら、この操作は古い
@@ -242,7 +296,14 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
       return false;
     }
 
+    final removed = current.first;
     final rest = current.sublist(1);
+
+    // Undo 用に直前の 1 枚として記録する（同一インスタンスを保持）
+    _lastRemoved = removed;
+    _lastRemovedDeckToken = _deckGeneration;
+    _lastRemovedShouldUnfavorite = undoRemovesFavorite;
+
     state = AsyncValue.data(rest);
 
     // 画像の残りが閾値未満の場合、追加画像を読み込む
@@ -251,6 +312,47 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
     }
     return true;
   }
+
+  /// 直前の 1 枚を山札の先頭へ戻す（Undo, #9）。
+  ///
+  /// 戻すのは新しいインスタンスではなく [_lastRemoved] そのもの。
+  /// `_CardStack`（swipe_screen.dart）は [ObjectKey]（identical 比較）で
+  /// カードを識別しているため、値が同じでも別インスタンスのコピーを
+  /// 戻すと「別のカード」として扱われ、SwipeCard 側のドラッグ状態などが
+  /// 意図せずリセットされてしまう。
+  ///
+  /// 戻す先の山札が既に入れ替わっている場合（[canUndo] が false）は
+  /// 何もせず null を返す。
+  ///
+  /// 成功時、その除去が「好き」由来でお気に入りの取消が必要だったかを
+  /// [UndoResult] で呼び出し元に返す。favoritesProvider の更新自体は
+  /// このメソッドの責務にしない（Notifier 間の直接依存を避けるため、
+  /// 呼び出し元の SwipeScreen が favoritesProvider を操作する）。
+  UndoResult? undo() {
+    if (!canUndo) return null;
+
+    final restored = _lastRemoved!;
+    final shouldUnfavorite = _lastRemovedShouldUnfavorite;
+    final current = state.value ?? const <AnimalImage>[];
+    state = AsyncValue.data([restored, ...current]);
+
+    _lastRemoved = null;
+    _lastRemovedDeckToken = null;
+    _lastRemovedShouldUnfavorite = false;
+
+    return UndoResult(image: restored, shouldUnfavorite: shouldUnfavorite);
+  }
+}
+
+/// [AnimalImagesNotifier.undo] が成功した際に返す結果。
+///
+/// お気に入りの取消は favoritesProvider の責務なので、ここでは
+/// 「取り消すべきかどうか」の情報だけを運ぶ。
+class UndoResult {
+  final AnimalImage image;
+  final bool shouldUnfavorite;
+
+  const UndoResult({required this.image, required this.shouldUnfavorite});
 }
 
 /// 取得には成功したが 1 件も画像が得られなかったことを表す例外

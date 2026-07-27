@@ -31,6 +31,7 @@ class AppStrings {
   static const String retry = 'もう一度試す';
   static const String skip = '次へ';
   static const String like = '好き';
+  static const String undo = '取り消す';
 
   // Swipe Card
   static const String imageLoadError = '画像の読み込みに失敗しました';
