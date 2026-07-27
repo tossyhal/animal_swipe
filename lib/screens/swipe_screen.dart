@@ -7,10 +7,12 @@ import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
 import '../models/animal_model.dart';
 import '../providers/animal_providers.dart';
+import '../providers/favorites_provider.dart';
 import '../theme/theme_extensions.dart';
 import '../widgets/common/action_button.dart';
 import '../widgets/common/gradient_background.dart';
 import '../widgets/swipe_card.dart';
+import 'favorites_screen.dart';
 import 'start_screen.dart';
 
 class SwipeScreen extends ConsumerStatefulWidget {
@@ -59,20 +61,32 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
 
   /// [deckToken] はカードを表示した時点の山札世代。スワイプ完了は 250ms 遅れて
   /// 通知されるため、その間に山札が入れ替わっていないかを Notifier に照合させる。
-  void _skip(int deckToken) {
+  void _skip(int deckToken, AnimalImage swipedImage) {
     if (_isRefreshing) return;
     ref
         .read(animalImagesProvider.notifier)
-        .removeTopImage(deckToken: deckToken);
+        .removeTopImage(deckToken: deckToken, expectedTop: swipedImage);
   }
 
-  void _like(int deckToken) {
+  /// [swipedImage] は「実際にスワイプされたカード」そのもの。
+  ///
+  /// ここで山札の先頭を読み直してはいけない。スワイプ完了は 250ms 遅れて
+  /// 通知されるため、その間に別の操作で山札が 1 枚進むと、先頭は
+  /// 「スワイプされていない次のカード」に入れ替わっている。
+  /// 通常の除去では [deckGeneration] が変わらず `removeTopImage` は
+  /// 古いトークンを受け付けてしまうので、トークンだけでは防げない。
+  /// カードを描画した時点の画像を呼び出し側から渡してもらうことで、
+  /// 見ていない画像がお気に入りに入る事故を防ぐ。
+  void _like(int deckToken, AnimalImage swipedImage) {
     if (_isRefreshing) return;
     final removed = ref
         .read(animalImagesProvider.notifier)
-        .removeTopImage(deckToken: deckToken);
-    // 古い操作で山札が変化しなかった場合は「好き」の通知も出さない
-    if (removed) _showLikedMessage();
+        .removeTopImage(deckToken: deckToken, expectedTop: swipedImage);
+    // 古い操作で山札が変化しなかった場合は「好き」の通知もお気に入り登録もしない
+    if (removed) {
+      ref.read(favoritesProvider.notifier).add(swipedImage);
+      _showLikedMessage();
+    }
   }
 
   /// 画面に描画中のスタック（先頭 3 枚）よりさらに先の画像を、
@@ -107,6 +121,25 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
         precacheImage(provider, context, onError: (error, stackTrace) {}),
       );
     }
+  }
+
+  void _goHome(BuildContext context) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const StartScreen()),
+    );
+  }
+
+  /// AppBar の「選び直す」をアイコンだけに畳むべきか
+  ///
+  /// タイトル（アイコン＋アプリ名）とお気に入りアイコン、そして
+  /// 「選び直す」のラベルを横に並べると、狭い端末では入りきらない。
+  /// 実効幅（論理幅 ÷ 文字倍率）で判定しているのは、文字サイズを
+  /// 上げている利用者では同じ論理幅でもラベルが長くなるため。
+  static bool _isCompactAppBar(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final effectiveWidth =
+        mediaQuery.size.width / mediaQuery.textScaler.scale(1);
+    return effectiveWidth < AppSizes.compactAppBarWidthThreshold;
   }
 
   @override
@@ -152,22 +185,48 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
           ],
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.s8),
-            child: TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: onGradient),
-              icon: const Icon(Icons.home, size: AppSizes.iconHomeButton),
-              label: const Text(
-                AppStrings.homeButton,
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<void>(builder: (_) => const StartScreen()),
-                );
-              },
-            ),
+          IconButton(
+            tooltip: AppStrings.favoritesButtonTooltip,
+            // ハートは「好き」を送るボタンと同じ Icons.favorite にすると
+            // find.byIcon での判別がつかなくなる（UI 上も紛らわしい）ため、
+            // 一覧を表す別のアイコンにする
+            icon: const Icon(Icons.collections),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const FavoritesScreen(),
+                ),
+              );
+            },
           ),
+          // お気に入りのアイコンが増えた分、狭い画面ではタイトルと
+          // 「選び直す」のラベルが横幅を奪い合ってオーバーフローする。
+          // 幅が足りないときはラベルを畳んでアイコンだけにする。
+          // 文字サイズを大きくしている利用者でも同じことが起きるため、
+          // 判定には textScaler を掛けた実効幅を使う。
+          if (_isCompactAppBar(context))
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.s8),
+              child: IconButton(
+                tooltip: AppStrings.homeButton,
+                color: onGradient,
+                icon: const Icon(Icons.home, size: AppSizes.iconHomeButton),
+                onPressed: () => _goHome(context),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.s8),
+              child: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: onGradient),
+                icon: const Icon(Icons.home, size: AppSizes.iconHomeButton),
+                label: const Text(
+                  AppStrings.homeButton,
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => _goHome(context),
+              ),
+            ),
         ],
       ),
       body: GradientBackground(
@@ -208,8 +267,8 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                       if (images.isEmpty) return const _LoadingState();
                       return _CardStack(
                         images: images,
-                        onSwipeLeft: () => _skip(deckToken),
-                        onSwipeRight: () => _like(deckToken),
+                        onSwipeLeft: (image) => _skip(deckToken, image),
+                        onSwipeRight: (image) => _like(deckToken, image),
                       );
                     },
                     loading: () => const _LoadingState(),
@@ -225,7 +284,13 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ActionButton(
-                      onPressed: hasImage ? () => _skip(deckToken) : null,
+                      // ボタン経由でも、押した瞬間の先頭カードを固定して渡す
+                      onPressed: hasImage
+                          ? () {
+                              final top = imagesAsync.value?.firstOrNull;
+                              if (top != null) _skip(deckToken, top);
+                            }
+                          : null,
                       icon: Icons.close,
                       backgroundColor: context.colors.error,
                       foregroundColor: context.colors.onError,
@@ -233,7 +298,13 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                     ),
                     const SizedBox(width: AppSpacing.s44),
                     ActionButton(
-                      onPressed: hasImage ? () => _like(deckToken) : null,
+                      // ボタン経由でも、押した瞬間の先頭カードを固定して渡す
+                      onPressed: hasImage
+                          ? () {
+                              final top = imagesAsync.value?.firstOrNull;
+                              if (top != null) _like(deckToken, top);
+                            }
+                          : null,
                       icon: Icons.favorite,
                       backgroundColor: context.colors.secondary,
                       foregroundColor: context.colors.onSecondary,
@@ -257,8 +328,14 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
 /// 先頭以外は [IgnorePointer] でジェスチャを受けない。
 class _CardStack extends StatelessWidget {
   final List<AnimalImage> images;
-  final VoidCallback onSwipeLeft;
-  final VoidCallback onSwipeRight;
+
+  /// スワイプされたカードそのものを受け取るコールバック。
+  ///
+  /// 引数なしにして呼び出し側で山札の先頭を読み直すと、スワイプ完了の
+  /// 通知が 250ms 遅れる間に山札が進んでいた場合、スワイプしていない
+  /// 別のカードを処理してしまう。描画時点の画像をそのまま渡す。
+  final void Function(AnimalImage image) onSwipeLeft;
+  final void Function(AnimalImage image) onSwipeRight;
 
   static const int _visibleCount = 3;
 
@@ -301,8 +378,8 @@ class _CardStack extends StatelessWidget {
     final card = SwipeCard(
       key: ObjectKey(image),
       image: image,
-      onSwipeLeft: onSwipeLeft,
-      onSwipeRight: onSwipeRight,
+      onSwipeLeft: () => onSwipeLeft(image),
+      onSwipeRight: () => onSwipeRight(image),
     );
 
     if (index == 0) return card;

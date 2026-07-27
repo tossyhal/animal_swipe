@@ -256,6 +256,43 @@ void main() {
       );
     });
 
+    test('先頭が期待したカードでなければ取り除かない', () async {
+      final api = FakeApiService();
+      final container = createContainer(api);
+      addTearDown(container.dispose);
+
+      await container.read(animalImagesProvider.future);
+      final notifier = container.read(animalImagesProvider.notifier);
+      final deck = container.read(animalImagesProvider).requireValue;
+      expect(deck.length, greaterThan(1));
+
+      final token = notifier.deckGeneration;
+
+      // アニメーション中に別操作で山札が 1 枚進んだ状況
+      expect(notifier.removeTopImage(deckToken: token), isTrue);
+      final advanced = container.read(animalImagesProvider).requireValue;
+
+      // 遅れて届いた「元の先頭カード」のスワイプ完了。世代は変わって
+      // いないのでトークンだけでは弾けない。
+      final removed = notifier.removeTopImage(
+        deckToken: token,
+        expectedTop: deck.first,
+      );
+
+      expect(removed, isFalse, reason: '既に取り除かれたカードの操作は無視される');
+      expect(
+        container.read(animalImagesProvider).requireValue,
+        advanced,
+        reason: '無関係なカードが黙って捨てられていないこと',
+      );
+
+      // 現在の先頭を渡せば通る
+      expect(
+        notifier.removeTopImage(deckToken: token, expectedTop: advanced.first),
+        isTrue,
+      );
+    });
+
     // invalidate すると Notifier ごと作り直されるため、インスタンス内の
     // カウンタでトークンを採番すると新旧で同じ値が再利用され、古い操作が
     // 新しい山札を通過してしまう。採番元がプロセス全体で単調増加すること。

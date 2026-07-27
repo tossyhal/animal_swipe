@@ -38,6 +38,16 @@ class AppStrings {
   // Snackbar Messages
   static const String liked = '「好き」を送りました';
 
+  // Favorites
+  static const String favoritesButtonTooltip = 'お気に入り';
+  static const String favoritesTitle = 'お気に入り';
+  static const String favoritesEmptyTitle = 'まだお気に入りがありません';
+  static const String favoritesEmptyMessage = 'スワイプ画面で好きな子に「好き」を送ってみましょう。';
+  static const String favoritesDeleteDialogTitle = 'お気に入りから削除しますか？';
+  static const String favoritesDeleteDialogConfirm = '削除する';
+  static const String favoritesDialogCancel = 'キャンセル';
+  static const String favoritesDialogClose = '閉じる';
+
   // Font Family
   static const String fontFamily = 'MPLUSRounded1c';
 

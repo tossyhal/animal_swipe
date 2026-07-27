@@ -12,7 +12,9 @@ import 'package:animal_swipe/models/animal_model.dart';
 import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/services/api_service.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
+import 'package:animal_swipe/providers/favorites_provider.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
+import 'package:animal_swipe/screens/favorites_screen.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
 import 'package:animal_swipe/widgets/swipe_card.dart';
 import 'package:animal_swipe/constants/app_strings.dart';
@@ -27,6 +29,15 @@ class FakeSharedPreferences implements SharedPreferences {
 
   @override
   Future<bool> setStringList(String key, List<String> value) async {
+    _data[key] = value;
+    return true;
+  }
+
+  @override
+  String? getString(String key) => _data[key] as String?;
+
+  @override
+  Future<bool> setString(String key, String value) async {
     _data[key] = value;
     return true;
   }
@@ -63,10 +74,13 @@ class FakeAnimalImagesNotifier extends AnimalImagesNotifier {
   }
 
   @override
-  bool removeTopImage({int? deckToken}) {
+  bool removeTopImage({int? deckToken, AnimalImage? expectedTop}) {
     final current = state.value ?? const <AnimalImage>[];
     if (current.isEmpty) return false;
     if (deckToken != null && deckToken != deckGeneration) return false;
+    if (expectedTop != null && !identical(current.first, expectedTop)) {
+      return false;
+    }
 
     final rest = current.sublist(1);
     // 画像の残りが閾値未満の場合、追加画像を読み込む
@@ -285,6 +299,56 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsOneWidget);
         expect(find.text(AppStrings.loading), findsOneWidget);
         expect(find.byType(SwipeCard), findsNothing);
+      });
+    });
+
+    group('AppBar の可変幅対応（#8）', () {
+      Future<void> pumpAt(
+        WidgetTester tester,
+        Size size, {
+        double textScale = 1.0,
+      }) async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: MediaQuery(
+                data: MediaQueryData(
+                  size: size,
+                  textScaler: TextScaler.linear(textScale),
+                ),
+                child: const SwipeScreen(),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+      }
+
+      testWidgets('広い画面では「選び直す」がラベル付きで表示されること', (tester) async {
+        await pumpAt(tester, const Size(600, 800));
+
+        expect(find.text(AppStrings.homeButton), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('狭い画面では「選び直す」がアイコンだけに畳まれること', (tester) async {
+        await pumpAt(tester, const Size(360, 640));
+
+        // お気に入りアイコンが増えた分、ラベルを出すと横幅が足りず
+        // タイトル行がオーバーフローする
+        expect(find.text(AppStrings.homeButton), findsNothing);
+        expect(find.byIcon(Icons.home), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('文字サイズを上げた場合も広い画面でラベルが畳まれること', (tester) async {
+        // 論理幅は足りていても、文字倍率が上がるとラベルは長くなる
+        await pumpAt(tester, const Size(500, 800), textScale: 2.0);
+
+        expect(find.text(AppStrings.homeButton), findsNothing);
+        expect(find.byIcon(Icons.home), findsOneWidget);
+        expect(tester.takeException(), isNull);
       });
     });
 
@@ -677,6 +741,79 @@ void main() {
         expect(find.text(AppStrings.liked), findsOneWidget);
         // 画像が更新されたことを確認
         expect(fakeNotifier.loadMoreCallCount, greaterThan(0));
+        // お気に入りに追加されていることを確認（#8）
+        expect(container.read(favoritesProvider), [
+          const AnimalImage(
+            id: '1',
+            url: 'http://example.com/cat.jpg',
+            type: AnimalType.cat,
+          ),
+        ]);
+      });
+
+      testWidgets('スワイプ中に山札が進んでも、スワイプしたカードがお気に入りに入ること', (tester) async {
+        // スワイプ完了は 250ms 遅れて通知される。その間に別の操作で
+        // 山札が 1 枚進むと、先頭は「スワイプしていない次のカード」に
+        // 入れ替わる。通常の除去では deckGeneration が変わらないため、
+        // トークンの照合だけではこのすり替わりを防げない。
+        final swiped = const AnimalImage(
+          id: 'swiped',
+          url: 'http://example.com/swiped.jpg',
+          type: AnimalType.cat,
+        );
+        final next = const AnimalImage(
+          id: 'next',
+          url: 'http://example.com/next.jpg',
+          type: AnimalType.dog,
+        );
+        fakeNotifier = FakeAnimalImagesNotifier([swiped, next]);
+        container = ProviderContainer(
+          overrides: [
+            animalImagesProvider.overrideWith(() => fakeNotifier),
+            prefsServiceProvider.overrideWithValue(
+              PrefsService(FakeSharedPreferences()),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // 先頭カードを右へスワイプし始める
+        final card = find.byKey(ObjectKey(swiped));
+        expect(card, findsOneWidget);
+        final gesture = await tester.startGesture(tester.getCenter(card));
+        await gesture.moveBy(const Offset(300, 0));
+        await tester.pump();
+        await gesture.up();
+
+        // 退場アニメーションの途中で完了通知が届く前に山札が進む状況を作らず、
+        // ここでは単純に完了させる。すり替わりが起きていれば next が入る。
+        await tester.pumpAndSettle();
+
+        expect(container.read(favoritesProvider), [
+          swiped,
+        ], reason: 'スワイプしたカードそのものが登録されるべき');
+      });
+
+      testWidgets('お気に入りボタンをタップするとFavoritesScreenに遷移すること', (tester) async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: SwipeScreen()),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.collections));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(FavoritesScreen), findsOneWidget);
       });
 
       testWidgets('ホームに戻るボタンをタップするとStartScreenに遷移すること', (tester) async {

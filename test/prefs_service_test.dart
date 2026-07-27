@@ -1,4 +1,5 @@
 // test/prefs_service_test.dart
+import 'package:animal_swipe/models/animal_model.dart';
 import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
 import 'package:flutter/material.dart';
@@ -215,6 +216,71 @@ void main() {
           [AnimalType.cat, AnimalType.dog],
           reason: '新しいインスタンスでも保存済みのデータを取得できること',
         );
+      });
+    });
+
+    group('お気に入りのテスト（#8）', () {
+      const catImage = AnimalImage(
+        id: 'cat-1',
+        url: 'https://example.com/cat-1.jpg',
+        type: AnimalType.cat,
+        description: 'ふわふわ',
+        source: 'Cat as a service',
+      );
+      const dogImage = AnimalImage(
+        id: 'dog-1',
+        url: 'https://example.com/dog-1.jpg',
+        type: AnimalType.dog,
+      );
+
+      test('初期状態ではお気に入りは空であること', () {
+        expect(prefsService.getFavorites(), isEmpty);
+      });
+
+      test('お気に入りを保存して取得できること（往復できる）', () async {
+        await prefsService.saveFavorites([catImage, dogImage]);
+
+        expect(prefsService.getFavorites(), [catImage, dogImage]);
+      });
+
+      test('新しいPrefsServiceインスタンスでも保存済みのお気に入りを取得できること', () async {
+        await prefsService.saveFavorites([catImage]);
+
+        final newPrefsService = PrefsService(prefs);
+
+        expect(newPrefsService.getFavorites(), [catImage]);
+      });
+
+      test('JSON全体が壊れている場合は空リストとして扱い、落ちないこと', () async {
+        await prefs.setString('favorite_animal_images', '{ this is not json');
+
+        expect(prefsService.getFavorites(), isEmpty);
+      });
+
+      test('JSONが配列でない場合は空リストとして扱うこと', () async {
+        await prefs.setString('favorite_animal_images', '{"foo": "bar"}');
+
+        expect(prefsService.getFavorites(), isEmpty);
+      });
+
+      test('一部の要素だけ壊れていても、残りは復元されること', () async {
+        // 1件目は正常、2件目は type が未知、3件目は必須フィールド欠落
+        await prefs.setString(
+          'favorite_animal_images',
+          '['
+              '{"id":"cat-1","url":"https://example.com/cat-1.jpg","type":"cat","description":null,"source":null},'
+              '{"id":"x","url":"https://example.com/x.jpg","type":"unicorn"},'
+              '{"id":"y"}'
+              ']',
+        );
+
+        expect(prefsService.getFavorites(), [
+          const AnimalImage(
+            id: 'cat-1',
+            url: 'https://example.com/cat-1.jpg',
+            type: AnimalType.cat,
+          ),
+        ]);
       });
     });
   });

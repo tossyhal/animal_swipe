@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/animal_model.dart';
 import '../models/animal_type.dart';
+import '../utils/logger.dart';
 
 /// [PrefsService] を提供するプロバイダー
 /// ※ProviderScopeで上書きする必要があります
@@ -16,6 +20,9 @@ class PrefsService {
 
   /// 選択された動物タイプを保存するためのキー
   static const String _selectedTypesKey = 'selected_animal_types';
+
+  /// お気に入り（[AnimalImage] の JSON 配列）を保存するためのキー
+  static const String _favoritesKey = 'favorite_animal_images';
 
   /// コンストラクタ
   PrefsService(this._prefs);
@@ -69,5 +76,55 @@ class PrefsService {
   /// 指定されたテーマモードをローカルストレージに保存する
   Future<void> saveThemeMode(ThemeMode mode) async {
     await _prefs.setString(_themeModeKey, mode.name);
+  }
+
+  /// ローカルストレージからお気に入りの動物画像リストを取得する
+  ///
+  /// 保存形式は [AnimalImage.toJson] の配列を JSON エンコードした文字列。
+  /// **壊れたデータで起動に失敗させない。** 端末間コピーや手動編集、将来の
+  /// スキーマ変更で JSON が壊れていても、読める分だけ返す。
+  ///
+  /// - JSON 全体が壊れている（デコードできない・配列でない）場合は空リスト。
+  /// - 配列の一部の要素だけが壊れている（[AnimalImage.fromJson] が失敗する）
+  ///   場合は、その要素だけを読み飛ばし、残りは復元する。
+  List<AnimalImage> getFavorites() {
+    final raw = _prefs.getString(_favoritesKey);
+    if (raw == null || raw.isEmpty) return const <AnimalImage>[];
+
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException catch (e) {
+      AppLogger.warning('お気に入りの JSON が壊れています。空として扱います: $e');
+      return const <AnimalImage>[];
+    }
+
+    if (decoded is! List) {
+      AppLogger.warning('お気に入りのデータ形式が不正です（配列ではありません）。空として扱います');
+      return const <AnimalImage>[];
+    }
+
+    final favorites = <AnimalImage>[];
+    for (final entry in decoded) {
+      if (entry is! Map) continue;
+      try {
+        favorites.add(AnimalImage.fromJson(Map<String, dynamic>.from(entry)));
+      } on FormatException catch (e) {
+        // 1件の破損で全体を失わないよう、その要素だけ読み飛ばす
+        AppLogger.warning('お気に入りの1件を読み飛ばしました: $e');
+      }
+    }
+    return favorites;
+  }
+
+  /// お気に入りの動物画像リストをローカルストレージへ保存する
+  ///
+  /// 上限件数の判定・古いものの間引きは呼び出し側（[FavoritesNotifier]）の
+  /// 責務とし、ここでは渡されたリストをそのまま永続化する。
+  Future<void> saveFavorites(List<AnimalImage> favorites) async {
+    final encoded = jsonEncode(
+      favorites.map((image) => image.toJson()).toList(),
+    );
+    await _prefs.setString(_favoritesKey, encoded);
   }
 }

@@ -218,8 +218,16 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
   /// 再取得が完了して別の山札に入れ替わっていることがある。世代が変わって
   /// いれば、その操作はもう存在しない山札に対するものなので無視する。
   ///
+  /// [expectedTop] にはスワイプされたカードそのものを渡す。
+  ///
+  /// [deckToken] だけでは足りない。山札を 1 枚進めるだけの通常の除去では
+  /// [deckGeneration] は変わらないため、アニメーション中に別の操作で
+  /// 山札が進んでいても古いトークンが通ってしまい、**スワイプしていない
+  /// 次のカードを黙って捨ててしまう**。先頭が期待どおりかを
+  /// ここで照合することで、判定と除去を不可分にする。
+  ///
   /// 実際に取り除いた場合のみ true を返す。
-  bool removeTopImage({int? deckToken}) {
+  bool removeTopImage({int? deckToken, AnimalImage? expectedTop}) {
     // 再取得中は前回の山札が state に残っているが、それはもう表示対象ではない
     if (state.isLoading) return false;
     // 表示時と別の山札に入れ替わっているなら、この操作は古い
@@ -227,6 +235,12 @@ class AnimalImagesNotifier extends AsyncNotifier<List<AnimalImage>> {
 
     final current = state.value;
     if (current == null || current.isEmpty) return false;
+
+    // identical で比較する。AnimalImage は値等価なので、API が同じ画像を
+    // 返した場合に == だと別のカードを取り違える。
+    if (expectedTop != null && !identical(current.first, expectedTop)) {
+      return false;
+    }
 
     final rest = current.sublist(1);
     state = AsyncValue.data(rest);

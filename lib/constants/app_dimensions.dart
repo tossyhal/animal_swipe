@@ -69,6 +69,9 @@ class AppRadius {
 
   /// スワイプカード本体
   static const double swipeCard = 28;
+
+  /// お気に入り一覧のグリッドタイル
+  static const double favoriteTile = 16;
 }
 
 /// アニメーション時間
@@ -258,4 +261,21 @@ class AppSizes {
   /// 画面に表示中のスタック（3 枚）よりさらに先の、明示的に
   /// `precacheImage` で先読みしておく枚数
   static const int cardStackPreloadAhead = 2;
+
+  /// AppBar のテキスト付きアクションをアイコンだけに畳む実効幅のしきい値
+  ///
+  /// タイトル・お気に入り・「選び直す」を横に並べて収まる下限の目安。
+  /// 判定には文字倍率で割った実効幅を使う（[SwipeScreen] 参照）。
+  static const double compactAppBarWidthThreshold = 420;
+
+  // ---- お気に入り一覧 ----
+
+  /// グリッドの列数
+  static const int favoritesGridColumns = 3;
+
+  /// グリッドタイル間の余白
+  static const double favoritesGridSpacing = 8;
+
+  /// 空状態アイコン
+  static const double iconFavoritesEmpty = 48;
 }
