@@ -586,6 +586,53 @@ void main() {
         // 右スワイプコールバックが呼ばれたことを確認
         expect(onSwipeRightCalled, true);
       });
+
+      testWidgets('ドラッグ中にカード本体が再構築されないこと（#22）', (tester) async {
+        // ドラッグ量を setState で保持すると、Image / Card を含む巨大な
+        // ツリー全体が毎フレーム再構築されカクつきの原因になっていた。
+        // ValueListenableBuilder の child として渡したカード本体は
+        // インスタンスごと使い回されるはずなので、ドラッグ中も同一の
+        // Card ウィジェットインスタンスであり続けることを確認する。
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SwipeCard(
+                image: const AnimalImage(
+                  id: '1',
+                  url: 'http://example.com/cat.jpg',
+                  type: AnimalType.cat,
+                ),
+                onSwipeLeft: () {},
+                onSwipeRight: () {},
+              ),
+            ),
+          ),
+        );
+
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(SwipeCard)),
+        );
+        // 最初の移動でジェスチャ認識され onPanStart の setState が走るため、
+        // 「ドラッグ開始済み」の状態を基準にしてから比較する。
+        await gesture.moveBy(const Offset(10, 2));
+        await tester.pump();
+        final cardBefore = tester.widget<Card>(find.byType(Card));
+
+        for (var i = 0; i < 5; i++) {
+          await gesture.moveBy(const Offset(10, 2));
+          await tester.pump();
+        }
+
+        final cardAfter = tester.widget<Card>(find.byType(Card));
+        expect(
+          identical(cardBefore, cardAfter),
+          isTrue,
+          reason: 'ドラッグ中に Card の中身が再構築されてはいけない',
+        );
+
+        await gesture.up();
+        await tester.pumpAndSettle();
+      });
     });
 
     group('エラーハンドリングテスト', () {
