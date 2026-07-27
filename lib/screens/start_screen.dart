@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
 import '../providers/animal_providers.dart';
 import '../theme/theme_extensions.dart';
@@ -29,7 +30,9 @@ class StartScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedTypes = ref.watch(selectedAnimalTypesProvider);
     // GradientBackground は primary をベースにするため、その上の前景は onPrimary 系
-    final onGradientMuted = context.colors.onPrimary.withValues(alpha: 0.7);
+    final onGradientMuted = context.colors.onPrimary.withValues(
+      alpha: AppOpacity.onGradientMuted,
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -37,26 +40,27 @@ class StartScreen extends ConsumerWidget {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final horizontalPadding = constraints.maxWidth < 420
-                  ? 20.0
-                  : 32.0;
+              final horizontalPadding =
+                  constraints.maxWidth < AppSizes.compactWidthBreakpoint
+                  ? AppSpacing.s20
+                  : AppSpacing.s32;
 
               return SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
                   horizontalPadding,
-                  28,
+                  AppSpacing.s28,
                   horizontalPadding,
-                  24,
+                  AppSpacing.s24,
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - 52,
-                    maxWidth: 560,
+                    minHeight: constraints.maxHeight - AppSpacing.s52,
+                    maxWidth: AppSizes.contentMaxWidth,
                   ),
                   child: Column(
                     children: [
                       const _BrandHeader(),
-                      const SizedBox(height: 36),
+                      const SizedBox(height: AppSpacing.s36),
                       _SelectionPanel(
                         selectedTypes: selectedTypes,
                         onToggle: (type, isSelected) {
@@ -84,21 +88,21 @@ class StartScreen extends ConsumerWidget {
                               },
                       ),
                       Padding(
-                        padding: const EdgeInsets.only(top: 28),
+                        padding: const EdgeInsets.only(top: AppSpacing.s28),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.swipe_rounded,
-                              size: 18,
+                              size: AppSizes.iconHint,
                               color: onGradientMuted,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.s8),
                             Text(
                               AppStrings.swipeHint,
                               style: TextStyle(
                                 color: onGradientMuted,
-                                fontSize: 13,
+                                fontSize: AppSizes.font13,
                               ),
                             ),
                           ],
@@ -128,31 +132,35 @@ class _BrandHeader extends StatelessWidget {
       children: [
         DecoratedBox(
           decoration: BoxDecoration(
-            color: onGradient.withValues(alpha: 0.24),
+            color: onGradient.withValues(alpha: AppOpacity.brandBadge),
             shape: BoxShape.circle,
           ),
           child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Icon(Icons.pets_rounded, color: onGradient, size: 30),
+            padding: const EdgeInsets.all(AppSpacing.s14),
+            child: Icon(
+              Icons.pets_rounded,
+              color: onGradient,
+              size: AppSizes.iconBrand,
+            ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.s14),
         Text(
           AppStrings.appName,
           textAlign: TextAlign.center,
           style: TextStyle(
             height: 1,
-            fontSize: 42,
+            fontSize: AppSizes.font42,
             fontWeight: FontWeight.bold,
             letterSpacing: -1.5,
             color: onGradient,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.s12),
         Text(
           AppStrings.tagline,
           textAlign: TextAlign.center,
-          style: TextStyle(color: onGradient, fontSize: 15),
+          style: TextStyle(color: onGradient, fontSize: AppSizes.font15),
         ),
       ],
     );
@@ -174,39 +182,44 @@ class _SelectionPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: context.colors.surface.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(28),
+        color: context.colors.surface.withValues(alpha: AppOpacity.panel),
+        borderRadius: BorderRadius.circular(AppRadius.panel),
         boxShadow: [
           BoxShadow(
-            color: context.colors.shadow.withValues(alpha: 0.14),
+            color: context.colors.shadow.withValues(
+              alpha: AppOpacity.panelShadow,
+            ),
             blurRadius: 28,
             offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.s20),
         child: Column(
           children: [
             const Text(
               AppStrings.selectAnimalPrompt,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: AppSizes.font22,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.s4),
             Text(
               AppStrings.selectAnimalHint,
               style: context.textTheme.bodyMedium?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.s20),
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 childAspectRatio: 1.4,
-                crossAxisSpacing: 12,
+                crossAxisSpacing: AppSpacing.s12,
               ),
               itemCount: StartScreen._animalTypes.length,
               itemBuilder: (context, index) {
@@ -221,17 +234,17 @@ class _SelectionPanel extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.s20),
             SizedBox(
               width: double.infinity,
-              height: 56,
+              height: AppSizes.startButtonHeight,
               child: ElevatedButton(
                 onPressed: onStart,
                 style: ElevatedButton.styleFrom(
                   disabledBackgroundColor:
                       context.colors.surfaceContainerHighest,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(AppRadius.startButton),
                   ),
                 ),
                 child: const Row(
@@ -240,12 +253,15 @@ class _SelectionPanel extends StatelessWidget {
                     Text(
                       AppStrings.startButton,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: AppSizes.font17,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, size: 20),
+                    SizedBox(width: AppSpacing.s8),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: AppSizes.iconInline,
+                    ),
                   ],
                 ),
               ),
@@ -282,15 +298,15 @@ class _AnimalChoice extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.choice),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            padding: const EdgeInsets.all(12),
+            duration: AppDuration.choiceSelection,
+            padding: const EdgeInsets.all(AppSpacing.s12),
             decoration: BoxDecoration(
               color: isSelected
                   ? context.colors.primaryContainer
                   : context.colors.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.choice),
               border: Border.all(
                 color: isSelected
                     ? context.colors.primary
@@ -304,22 +320,25 @@ class _AnimalChoice extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(emoji, style: const TextStyle(fontSize: 44)),
-                      const SizedBox(height: 8),
+                      Text(
+                        emoji,
+                        style: const TextStyle(fontSize: AppSizes.font44),
+                      ),
+                      const SizedBox(height: AppSpacing.s8),
                       Text(
                         name,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                          fontSize: AppSizes.font18,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.s2),
                       Text(
                         description,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: AppSizes.font10,
                           color: context.colors.onSurfaceVariant,
                         ),
                       ),
@@ -333,7 +352,7 @@ class _AnimalChoice extends StatelessWidget {
                     child: Icon(
                       Icons.check,
                       color: context.colors.primary,
-                      size: 24,
+                      size: AppSizes.iconCheck,
                     ),
                   ),
               ],

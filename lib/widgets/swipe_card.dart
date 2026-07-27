@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../constants/app_constants.dart';
+import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
 import '../models/animal_model.dart';
 import '../theme/theme_extensions.dart';
@@ -34,12 +34,7 @@ class _SwipeCardState extends State<SwipeCard>
   void initState() {
     super.initState();
     _controller =
-        AnimationController(
-            vsync: this,
-            duration: const Duration(
-              milliseconds: AppConstants.animationDurationShort,
-            ),
-          )
+        AnimationController(vsync: this, duration: AppDuration.cardSwipe)
           ..addListener(() {
             final animation = _offsetAnimation;
             if (animation != null && mounted) {
@@ -175,9 +170,9 @@ class _SwipeCardState extends State<SwipeCard>
             child: Stack(
               children: [
                 Card(
-                  elevation: 5,
+                  elevation: AppSizes.elevationSwipeCard,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(AppRadius.swipeCard),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: SizedBox(
@@ -229,7 +224,7 @@ class _SwipeCardState extends State<SwipeCard>
                                         children: [
                                           Icon(
                                             Icons.error_outline,
-                                            size: 48,
+                                            size: AppSizes.iconImageError,
                                             color: colors.error,
                                           ),
                                           const SizedBox(height: 8),
@@ -251,13 +246,15 @@ class _SwipeCardState extends State<SwipeCard>
                                 left: 0,
                                 right: 0,
                                 child: Container(
-                                  height: 60,
+                                  height: AppSizes.imageScrimHeight,
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
                                       colors: [
-                                        colors.scrim.withValues(alpha: 0.4),
+                                        colors.scrim.withValues(
+                                          alpha: AppOpacity.imageScrim,
+                                        ),
                                         Colors.transparent,
                                       ],
                                     ),
@@ -270,13 +267,15 @@ class _SwipeCardState extends State<SwipeCard>
                                 left: 0,
                                 right: 0,
                                 child: Container(
-                                  height: 60,
+                                  height: AppSizes.imageScrimHeight,
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       begin: Alignment.bottomCenter,
                                       end: Alignment.topCenter,
                                       colors: [
-                                        colors.scrim.withValues(alpha: 0.4),
+                                        colors.scrim.withValues(
+                                          alpha: AppOpacity.imageScrim,
+                                        ),
                                         Colors.transparent,
                                       ],
                                     ),
@@ -290,11 +289,11 @@ class _SwipeCardState extends State<SwipeCard>
                           decoration: BoxDecoration(
                             color: colors.surface,
                             borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(28),
-                              bottomRight: Radius.circular(28),
+                              bottomLeft: Radius.circular(AppRadius.swipeCard),
+                              bottomRight: Radius.circular(AppRadius.swipeCard),
                             ),
                           ),
-                          padding: const EdgeInsets.all(16.0),
+                          padding: const EdgeInsets.all(AppSpacing.s16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -302,27 +301,29 @@ class _SwipeCardState extends State<SwipeCard>
                                 Text(
                                   widget.image.description!,
                                   style: TextStyle(
-                                    fontSize: 18,
+                                    fontSize: AppSizes.font18,
                                     fontWeight: FontWeight.bold,
                                     color: colors.onSurface,
                                   ),
                                 ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.s4),
                               Row(
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
+                                      horizontal: AppSpacing.s8,
+                                      vertical: AppSpacing.s4,
                                     ),
                                     decoration: BoxDecoration(
                                       color: colors.primaryContainer,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(
+                                        AppRadius.chip,
+                                      ),
                                     ),
                                     child: Text(
                                       widget.image.type.toUpperCase(),
                                       style: TextStyle(
-                                        fontSize: 14,
+                                        fontSize: AppSizes.font14,
                                         fontWeight: FontWeight.w500,
                                         color: colors.onPrimaryContainer,
                                       ),
@@ -337,22 +338,23 @@ class _SwipeCardState extends State<SwipeCard>
                     ),
                   ),
                 ),
-                // スワイプ方向に応じたアイコン表示（ドラッグ量が20を超えた場合）
-                if (_dragOffset.dx.abs() > 20)
+                // スワイプ方向に応じたアイコン表示
+                // （ドラッグ量が swipeBadgeRevealDistance を超えた場合）
+                if (_dragOffset.dx.abs() > AppSizes.swipeBadgeRevealDistance)
                   Positioned(
-                    top: 20,
-                    right: isLiked ? 20 : null,
-                    left: isLiked ? null : 20,
+                    top: AppSpacing.s20,
+                    right: isLiked ? AppSpacing.s20 : null,
+                    left: isLiked ? null : AppSpacing.s20,
                     child: Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(AppSpacing.s12),
                       decoration: BoxDecoration(
                         color: (isLiked ? colors.secondary : colors.error)
-                            .withValues(alpha: 0.9),
+                            .withValues(alpha: AppOpacity.swipeBadge),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
                             color: (isLiked ? colors.secondary : colors.error)
-                                .withValues(alpha: 0.5),
+                                .withValues(alpha: AppOpacity.swipeBadgeGlow),
                             blurRadius: 10,
                             spreadRadius: 2,
                           ),
@@ -361,7 +363,7 @@ class _SwipeCardState extends State<SwipeCard>
                       child: Icon(
                         isLiked ? Icons.favorite : Icons.close,
                         color: isLiked ? colors.onSecondary : colors.onError,
-                        size: 36,
+                        size: AppSizes.iconSwipeBadge,
                       ),
                     ),
                   ),

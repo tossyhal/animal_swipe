@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
-import '../constants/app_constants.dart';
+import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
 
 /// アプリのテーマ設定を管理するクラス
@@ -61,19 +61,19 @@ class AppTheme {
     return const TextTheme(
       titleLarge: TextStyle(
         fontWeight: FontWeight.bold,
-        fontSize: AppConstants.fontSizeXXLarge,
+        fontSize: AppSizes.font22,
       ),
-      bodyLarge: TextStyle(fontSize: AppConstants.fontSizeMedium),
-      bodyMedium: TextStyle(fontSize: AppConstants.fontSizeSmall),
+      bodyLarge: TextStyle(fontSize: AppSizes.font16),
+      bodyMedium: TextStyle(fontSize: AppSizes.font14),
     );
   }
 
   /// 共通のCardTheme設定
   static CardThemeData _buildCardTheme() {
     return CardThemeData(
-      elevation: AppConstants.elevationMedium,
+      elevation: AppSizes.elevationCard,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusLarge),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
     );
   }
@@ -86,13 +86,11 @@ class AppTheme {
       style: ElevatedButton.styleFrom(
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
-        elevation: AppConstants.elevationLow,
+        elevation: AppSizes.elevationButton,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+          borderRadius: BorderRadius.circular(AppRadius.elevatedButton),
         ),
-        padding: const EdgeInsets.symmetric(
-          vertical: AppConstants.paddingMedium,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
       ),
     );
   }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/app_constants.dart';
+import '../../constants/app_dimensions.dart';
 import '../../theme/theme_extensions.dart';
 
 /// 円形のアクションボタンウィジェット
@@ -32,29 +32,31 @@ class ActionButton extends StatelessWidget {
       enabled: isEnabled,
       label: label,
       child: Material(
-        elevation: isEnabled ? AppConstants.elevationMedium : 0,
+        elevation: isEnabled ? AppSizes.elevationCard : 0,
         color: Colors.transparent,
         shadowColor: backgroundColor.withValues(
-          alpha: AppConstants.opacityVeryLow,
+          alpha: AppOpacity.actionButtonShadowColor,
         ),
-        borderRadius: BorderRadius.circular(AppConstants.buttonRadius),
+        borderRadius: BorderRadius.circular(AppRadius.actionButton),
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(AppConstants.buttonRadius),
+          borderRadius: BorderRadius.circular(AppRadius.actionButton),
           child: Container(
-            width: 62,
-            height: 62,
+            width: AppSizes.actionButtonDiameter,
+            height: AppSizes.actionButtonDiameter,
             decoration: BoxDecoration(
               // 無効時は M3 の disabled トークン（onSurface 12% / 38%）に合わせる
               color: isEnabled
                   ? backgroundColor
-                  : colors.onSurface.withValues(alpha: 0.12),
+                  : colors.onSurface.withValues(
+                      alpha: AppOpacity.disabledContainer,
+                    ),
               shape: BoxShape.circle,
               boxShadow: isEnabled
                   ? [
                       BoxShadow(
                         color: backgroundColor.withValues(
-                          alpha: AppConstants.opacityLow,
+                          alpha: AppOpacity.actionButtonShadow,
                         ),
                         blurRadius: 12,
                         offset: const Offset(0, 5),
@@ -66,8 +68,10 @@ class ActionButton extends StatelessWidget {
               icon,
               color: isEnabled
                   ? foregroundColor
-                  : colors.onSurface.withValues(alpha: 0.38),
-              size: AppConstants.iconSizeMedium,
+                  : colors.onSurface.withValues(
+                      alpha: AppOpacity.disabledContent,
+                    ),
+              size: AppSizes.iconAction,
             ),
           ),
         ),

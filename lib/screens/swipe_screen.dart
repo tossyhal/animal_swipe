@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../constants/app_dimensions.dart';
 import '../constants/app_strings.dart';
 import '../providers/animal_providers.dart';
 import '../theme/theme_extensions.dart';
@@ -30,16 +31,20 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
         SnackBar(
           content: Row(
             children: [
-              Icon(Icons.favorite, color: onSnackBar, size: 20),
-              const SizedBox(width: 10),
+              Icon(
+                Icons.favorite,
+                color: onSnackBar,
+                size: AppSizes.iconInline,
+              ),
+              const SizedBox(width: AppSpacing.s10),
               Text(AppStrings.liked, style: TextStyle(color: onSnackBar)),
             ],
           ),
           backgroundColor: context.colors.secondary,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(milliseconds: 1300),
+          duration: AppDuration.likedSnackBar,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.snackBar),
           ),
         ),
       );
@@ -86,24 +91,27 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
       appBar: AppBar(
         backgroundColor: context.colors.primary,
         foregroundColor: onGradient,
-        titleSpacing: 20,
+        titleSpacing: AppSpacing.s20,
         title: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.pets_rounded, size: 21),
-            SizedBox(width: 8),
+            Icon(Icons.pets_rounded, size: AppSizes.iconAppBar),
+            SizedBox(width: AppSpacing.s8),
             Text(
               AppStrings.appName,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: AppSizes.font18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: AppSpacing.s8),
             child: TextButton.icon(
               style: TextButton.styleFrom(foregroundColor: onGradient),
-              icon: const Icon(Icons.home, size: 19),
+              icon: const Icon(Icons.home, size: AppSizes.iconHomeButton),
               label: const Text(
                 AppStrings.homeButton,
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -121,29 +129,36 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s18,
+              AppSpacing.s18,
+              AppSpacing.s18,
+              AppSpacing.s22,
+            ),
             child: Column(
               children: [
                 Text(
                   AppStrings.discoverTitle,
                   style: TextStyle(
                     color: onGradient,
-                    fontSize: 22,
+                    fontSize: AppSizes.font22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.s2),
                 Text(
                   AppStrings.discoverSubtitle,
                   style: TextStyle(
-                    color: onGradient.withValues(alpha: 0.7),
-                    fontSize: 13,
+                    color: onGradient.withValues(
+                      alpha: AppOpacity.onGradientMuted,
+                    ),
+                    fontSize: AppSizes.font13,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.s14),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
+                    duration: AppDuration.cardTransition,
                     child: imagesAsync.when(
                       skipLoadingOnRefresh: false,
                       data: (images) {
@@ -165,7 +180,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.s18),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -176,7 +191,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
                       foregroundColor: context.colors.onError,
                       label: AppStrings.skip,
                     ),
-                    const SizedBox(width: 44),
+                    const SizedBox(width: AppSpacing.s44),
                     ActionButton(
                       onPressed: hasImage ? () => _like(deckToken) : null,
                       icon: Icons.favorite,
@@ -208,15 +223,18 @@ class _LoadingState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 42,
-            height: 42,
-            child: CircularProgressIndicator(color: onGradient, strokeWidth: 3),
+            width: AppSizes.loadingIndicator,
+            height: AppSizes.loadingIndicator,
+            child: CircularProgressIndicator(
+              color: onGradient,
+              strokeWidth: AppSizes.loadingIndicatorStroke,
+            ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.s18),
           Text(
             AppStrings.loading,
             textAlign: TextAlign.center,
-            style: TextStyle(color: onGradient, fontSize: 15),
+            style: TextStyle(color: onGradient, fontSize: AppSizes.font15),
           ),
         ],
       ),
@@ -234,26 +252,29 @@ class _LoadError extends StatelessWidget {
     return Center(
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: context.colors.surface.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(24),
+          color: context.colors.surface.withValues(alpha: AppOpacity.panel),
+          borderRadius: BorderRadius.circular(AppRadius.loadError),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(AppSpacing.s28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.cloud_off_rounded,
-                size: 46,
+                size: AppSizes.iconLoadError,
                 color: context.colors.primary,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.s16),
               const Text(
                 AppStrings.loadErrorTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: AppSizes.font18,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.s8),
               Text(
                 AppStrings.loadErrorMessage,
                 textAlign: TextAlign.center,
@@ -261,7 +282,7 @@ class _LoadError extends StatelessWidget {
                   color: context.colors.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.s20),
               FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
