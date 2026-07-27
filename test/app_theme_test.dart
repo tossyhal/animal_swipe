@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animal_swipe/constants/app_colors.dart';
 import 'package:animal_swipe/constants/app_strings.dart';
 import 'package:animal_swipe/models/animal_model.dart';
+import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/providers/animal_providers.dart';
 import 'package:animal_swipe/screens/start_screen.dart';
 import 'package:animal_swipe/screens/swipe_screen.dart';
@@ -24,8 +25,12 @@ double _contrast(Color a, Color b) {
 
 class _FakeImagesNotifier extends AnimalImagesNotifier {
   @override
-  Future<List<AnimalImage>> build() async => [
-    AnimalImage(id: '1', url: 'http://example.com/cat.jpg', type: 'cat'),
+  Future<List<AnimalImage>> build() async => const [
+    AnimalImage(
+      id: '1',
+      url: 'http://example.com/cat.jpg',
+      type: AnimalType.cat,
+    ),
   ];
 }
 
