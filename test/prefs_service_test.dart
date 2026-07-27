@@ -1,6 +1,7 @@
 // test/prefs_service_test.dart
 import 'package:animal_swipe/models/animal_type.dart';
 import 'package:animal_swipe/services/prefs_service.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -146,6 +147,38 @@ void main() {
           AnimalType.cat,
           AnimalType.dog,
         ]);
+      });
+    });
+
+    group('テーマモードのテスト', () {
+      test('初期状態ではシステム設定に合わせるが返ること', () {
+        expect(prefsService.getThemeMode(), ThemeMode.system);
+      });
+
+      test('テーマモードを保存して取得できること', () async {
+        await prefsService.saveThemeMode(ThemeMode.dark);
+        expect(prefsService.getThemeMode(), ThemeMode.dark);
+
+        await prefsService.saveThemeMode(ThemeMode.light);
+        expect(prefsService.getThemeMode(), ThemeMode.light);
+      });
+
+      test('保存されるのは ThemeMode.name の文字列であること', () async {
+        await prefsService.saveThemeMode(ThemeMode.dark);
+        expect(prefs.getString('theme_mode'), 'dark');
+      });
+
+      // #15 の AnimalType と同じ方針: 未知・破損した値でも起動を失敗させない
+      test('保存済みデータが未知の文字列の場合はシステム設定にフォールバックすること', () async {
+        await prefs.setString('theme_mode', 'sepia');
+        expect(prefsService.getThemeMode(), ThemeMode.system);
+      });
+
+      test('新しいPrefsServiceインスタンスでも保存済みのテーマモードを取得できること', () async {
+        await prefsService.saveThemeMode(ThemeMode.dark);
+
+        final newPrefsService = PrefsService(prefs);
+        expect(newPrefsService.getThemeMode(), ThemeMode.dark);
       });
     });
 

@@ -7,6 +7,7 @@ import '../models/animal_type.dart';
 import '../providers/animal_providers.dart';
 import '../theme/theme_extensions.dart';
 import '../widgets/common/gradient_background.dart';
+import 'settings_screen.dart';
 import 'swipe_screen.dart';
 
 class StartScreen extends ConsumerWidget {
@@ -26,6 +27,27 @@ class StartScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        foregroundColor: context.colors.onPrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.settings_outlined,
+              size: AppSizes.iconSettings,
+            ),
+            tooltip: AppStrings.settingsTooltip,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: GradientBackground(
         child: SafeArea(
           child: LayoutBuilder(

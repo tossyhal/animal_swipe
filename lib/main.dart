@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'constants/app_strings.dart';
+import 'providers/theme_mode_provider.dart';
 import 'screens/start_screen.dart';
 import 'screens/swipe_screen.dart';
 import 'services/prefs_service.dart';
@@ -50,12 +51,14 @@ class AnimalSwipeApp extends ConsumerWidget {
     final hasSelection = ref
         .watch(prefsServiceProvider)
         .hasSelectedAnimalTypes();
+    // ユーザーが設定画面で選んだテーマモード（既定はシステム設定に追従）
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
       title: AppStrings.appTitle,
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       home: hasSelection ? const SwipeScreen() : const StartScreen(),
     );
   }

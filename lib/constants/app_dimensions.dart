@@ -155,6 +155,9 @@ class AppSizes {
   /// AppBar のロゴ
   static const double iconAppBar = 21;
 
+  /// 開始画面 AppBar の設定ボタン
+  static const double iconSettings = 22;
+
   /// 選択済みカードのチェック
   static const double iconCheck = 24;
 

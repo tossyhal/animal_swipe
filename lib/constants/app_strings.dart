@@ -40,4 +40,13 @@ class AppStrings {
 
   // Font Family
   static const String fontFamily = 'MPLUSRounded1c';
+
+  // Settings Screen
+  static const String settingsTitle = '設定';
+  static const String settingsTooltip = '設定を開く';
+  static const String themeSectionTitle = '画面の見た目';
+  static const String themeSectionDescription = 'ライト／ダーク／端末の設定に合わせるから選べます';
+  static const String themeModeLight = 'ライト';
+  static const String themeModeDark = 'ダーク';
+  static const String themeModeSystem = '端末の設定に合わせる';
 }

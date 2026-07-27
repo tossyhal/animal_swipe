@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,5 +46,28 @@ class PrefsService {
       if (!ids.contains(type.id)) ids.add(type.id);
     }
     await _prefs.setStringList(_selectedTypesKey, ids);
+  }
+
+  /// テーマモードを保存するためのキー
+  static const String _themeModeKey = 'theme_mode';
+
+  /// ローカルストレージからテーマモードを取得する
+  ///
+  /// 保存されているのは [ThemeMode.name] の文字列。[AnimalType] と同じ方針で、
+  /// 未知の値・欠損は例外にせず [ThemeMode.system] にフォールバックする。
+  /// 将来 [ThemeMode] に列挙子が増減しても、保存済みデータが壊れて起動に
+  /// 失敗することがないようにするため。
+  ThemeMode getThemeMode() {
+    final name = _prefs.getString(_themeModeKey);
+    if (name == null) return ThemeMode.system;
+    for (final mode in ThemeMode.values) {
+      if (mode.name == name) return mode;
+    }
+    return ThemeMode.system;
+  }
+
+  /// 指定されたテーマモードをローカルストレージに保存する
+  Future<void> saveThemeMode(ThemeMode mode) async {
+    await _prefs.setString(_themeModeKey, mode.name);
   }
 }
