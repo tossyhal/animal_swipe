@@ -54,11 +54,13 @@ class ErrorReporter {
       try {
         await appRunner();
       } catch (error, stackTrace) {
-        // 起動処理の失敗こそ最も知りたいクラッシュなので、握る前に
-        // 必ず Sentry へ送る。ここで握らないと SentryFlutter.init 越しに
-        // 伝播し、下の catch が「初期化の失敗」と誤認してしまうため、
-        // 「送ってから握って、あとで投げ直す」形にしている。
-        await Sentry.captureException(error, stackTrace: stackTrace);
+        // ここで握らないと SentryFlutter.init 越しに伝播し、
+        // 下の catch が「初期化の失敗」と誤認してしまう。
+        //
+        // 明示的な captureException は行わない。あとで投げ直すと
+        // Sentry が入れた PlatformDispatcher.onError の統合が同じ例外を
+        // もう一度拾い、起動失敗ごとにイベントが二重に記録されるため。
+        // 送信経路は「投げ直し → Sentry の統合が拾う」の 1 本に絞る。
         appError = error;
         appStackTrace = stackTrace;
       }

@@ -88,7 +88,9 @@ flutter build web --release --dart-define=SENTRY_DSN=https://xxxx@oNNN.ingest.se
 
 3. GitHub のリポジトリ設定で `SENTRY_DSN` を Actions secret として登録する
 
-CI / デプロイのワークフローは既に `--dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}` を渡すようになっています。**secret が未登録なら空文字が渡り、Sentry は初期化されません**（ビルドは失敗しません）。つまり secret を登録した時点で有効になります。
+デプロイのワークフローは既に `--dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}` を渡すようになっています。**secret が未登録なら空文字が渡り、Sentry は初期化されません**（ビルドは失敗しません）。つまり secret を登録した時点で有効になります。
+
+**PR プレビューには `SENTRY_DSN` を渡していません。** PR の試行錯誤で出たエラーが本番プロジェクトに混ざるとアラートが汚れ、無料枠も消費するためです。プレビューでも監視したい場合は、**別の Sentry プロジェクト**を作って `SENTRY_DSN_PREVIEW` を登録してください。未登録ならプレビューは監視なしでビルドされます。
 
 ### DSN の扱いについて
 

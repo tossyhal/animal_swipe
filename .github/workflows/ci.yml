@@ -99,8 +99,12 @@ jobs:
           cache: true
       - name: Get Flutter dependencies
         run: flutter pub get
+      # プレビューには本番の DSN を渡さない。渡すと PR の試行錯誤で出た
+      # エラーが本番プロジェクトへ混ざり、アラートが汚れて無料枠も食う。
+      # プレビュー用の Sentry プロジェクトを別に用意した場合だけ
+      # SENTRY_DSN_PREVIEW を設定する。未設定なら監視は無効のままビルドされる。
       - name: Build web
-        run: flutter build web --release --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+        run: flutter build web --release --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_PREVIEW }}
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
