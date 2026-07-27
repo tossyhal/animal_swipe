@@ -1,0 +1,417 @@
+name: API Health Check
+
+# 外部API（Cataas / Dog CEO）の定期死活監視。
+#
+# 目的:
+#   - アプリの変更なしに外部APIが破壊的変更・CORSヘッダー消失・
+#     ボット対策ページへの置換・HTTP画像混入などで突然利用不能になることを
+#     早期に検知する（issue #44）。
+#
+# 監視失敗時の扱い（issue #44 完了条件への回答）:
+#   - このワークフローの失敗は「通知のみ」とし、本番デプロイ（firebase-hosting-merge.yml）を
+#     直接停止する仕組みにはしない。
+#   - 理由: 外部APIの一時障害・レート制限・監視環境固有のネットワーク事情のみで
+#     デプロイをブロックすると、アプリ自体に問題がなくてもリリースが止まってしまい、
+#     可用性のコストがリスク低減効果に見合わない。
+#   - このワークフローはデプロイパイプラインとは独立してscheduleで実行され、
+#     失敗時はGitHub Actionsの実行結果（赤バツ）とジョブサマリーで検知できるようにする。
+#     Issues起票やSlack通知等への連携は将来必要になった時点で別途追加する
+#     （本PRのスコープ外）。
+#
+# 対象は「採用済み」APIのみ（Cataas, Dog CEO）。
+# The Cat API 等、まだ採用が決まっていない/調査中のAPIは対象に含めない。
+#
+# 負荷配慮:
+#   - MAX_ATTEMPTS=2 は「合計で最大2回試行する」（初回1回 + 再試行1回）の意味で
+#     実装している。issue #44 の「短い間隔で最大2回まで再試行」という文言は
+#     「再試行を2回（=合計3回試行）」とも読めるが、外部APIへの負荷を
+#     最小限にする方針（issue内「リクエスト数を最小限にし、外部APIへ
+#     負荷をかけない」）を優先し、あえて合計試行回数を2回に抑えている。
+#   - 画像本体の取得はHEADに近い形で最小限のバイト数のみ確認する
+#     （Rangeヘッダーで先頭のみ取得し、レスポンスは即座に破棄）。
+#   - すべてのcurl呼び出しに --connect-timeout / --max-time を設定し、
+#     外部APIが応答しない場合でもジョブが長時間ハングしないようにする。
+#
+# ログ方針:
+#   - 失敗時に出力するのは「API名・検証項目・HTTPステータス」のみ。
+#   - レスポンス本文全体やAPIキー等の秘匿情報はログに出さない。
+
+on:
+  schedule:
+    # 毎週月曜 03:00 UTC（日本時間 月曜 12:00）に実行
+    - cron: '0 3 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  PWA_ORIGIN: https://animal-swipe-596cc.web.app
+  MAX_ATTEMPTS: 2
+  RETRY_INTERVAL_SECONDS: 5
+  # アプリが 1 回のリクエストで要求する画像枚数。
+  # lib/services/animal_source.dart の kImagesPerRequest と一致させること
+  # （ワークフローから Dart の定数を参照できないため手動で同期する）。
+  # 本番と同じ枚数で叩かないと、単発では動くが複数枚要求が壊れている、
+  # という劣化を検知できない。
+  REQUESTED_IMAGE_COUNT: 10
+
+jobs:
+  api-health-check:
+    name: 外部API死活監視
+    runs-on: ubuntu-latest
+    # The Cat API のようなSecretsが必要なAPIは未採用のため、
+    # 現時点ではFork PRからの実行を禁止するSecrets依存は存在しない。
+    # 将来Secretsを要するAPIを追加する場合は、Fork PRでは
+    # `github.event.pull_request.head.repo.fork` 等で明示的にスキップすること。
+    steps:
+      - name: リポジトリのチェックアウト
+        # 各ステップで共通のヘッダー抽出処理（CORS判定など）を
+        # .github/scripts/api_health_lib.sh の1関数にまとめて source するため。
+        # ワークフローファイル自体はチェックアウトなしでも取得できるが、
+        # 追加のスクリプトファイルは明示的なチェックアウトがないと参照できない。
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Cataas API のヘルスチェック
+        id: cataas
+        run: |
+          set +e
+          source .github/scripts/api_health_lib.sh
+          api_name="Cataas"
+          # limit は lib/services/animal_source.dart の kImagesPerRequest(=10) と
+          # 揃える。1件だけの取得と10件同時取得とではAPI側のレート制限・
+          # レスポンス形状が異なりうるため、アプリが実際に叩くのと違う形の
+          # リクエストで監視すると「監視は green だがアプリは壊れている」
+          # 事態を見逃す。kImagesPerRequest を変更したらここも合わせて直すこと。
+          #
+          # skip=0 のままだと常に「先頭ページ」しか叩かないため、Cataas が
+          # 0以外の skip（ページネーション）だけを壊した場合に監視が拾えない。
+          # CatSource.buildUri は 0..999（_skipRange=1000）からランダムに選ぶが、
+          # ここではあえて固定値を使う。ランダム値だと失敗が再現しない
+          # 「たまに落ちる監視」になり、それ自体が原因調査を妨げてアラート
+          # 疲れを招くため、固定・再現可能な値の方が監視としては安全。
+          # 500 は 0..999 のほぼ中央で、範囲の端（0付近・999付近）だけ
+          # たまたま通ってしまう実装を見逃さないための代表値。_skipRange を
+          # 変更したら500が依然として範囲内であることを確認すること。
+          url="https://cataas.com/api/cats?limit=${REQUESTED_IMAGE_COUNT}&skip=500"
+          attempt=1
+          success=false
+
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            echo "::group::[$api_name] attempt $attempt/$MAX_ATTEMPTS"
+
+            headers_file=$(mktemp)
+            body_file=$(mktemp)
+            status=$(curl -sS --connect-timeout 10 --max-time 30 \
+              -o "$body_file" -D "$headers_file" -w '%{http_code}' \
+              -H "Origin: $PWA_ORIGIN" \
+              "$url")
+
+            if [ "$status" != "200" ]; then
+              echo "[$api_name] 検証項目=HTTPステータス Status=$status (期待値: 200)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            if ! check_content_type_json "$headers_file"; then
+              echo "[$api_name] 検証項目=Content-Type Status=$status (期待値: application/json, 実際: 予期しない形式)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            if ! check_cors_allows_origin "$headers_file" "$PWA_ORIGIN"; then
+              echo "[$api_name] 検証項目=CORSヘッダー Status=$status (期待値: Access-Control-Allow-Originが * または $PWA_ORIGIN)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            # 先頭要素だけを見て緑にしない。CatSource.parseResponse は配列全体を
+            # 処理するため、先頭に id があっても残りが欠けていれば山札はほぼ空に
+            # なる。要求した件数（limit=10）ぶん id を持つ要素が揃っているかを
+            # 数える。件数が減ること自体が検知したいバッチ契約の劣化。
+            valid_cat_count=$(jq -r '
+              if type == "array" then
+                ([.[] | select((type == "object") and ((.id | type) == "string") and (.id != ""))] | length)
+              else -1 end
+            ' "$body_file")
+            if [ "$valid_cat_count" != "$REQUESTED_IMAGE_COUNT" ]; then
+              echo "[$api_name] 検証項目=レスポンス構造(配列要素のid) Status=$status (期待値: idを持つ要素が${REQUESTED_IMAGE_COUNT}件 / 実際: ${valid_cat_count}件)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            cat_id=$(jq -r '.[0].id' "$body_file")
+
+            # 画像本体の確認（Status / Content-Type / HTTPS）
+            # height=1600 は lib/services/animal_source.dart の kCatImageHeight
+            # と合わせている（#7）。アプリが実際に要求するのと同じ形の URL を
+            # 監視しないと、この監視だけ通ってアプリ側だけ壊れる事態を見逃す。
+            image_url="https://cataas.com/cat/${cat_id}?height=1600"
+            image_headers_file=$(mktemp)
+            image_status=$(curl -sS --connect-timeout 10 --max-time 30 \
+              -o /dev/null -D "$image_headers_file" -w '%{http_code}' \
+              --range 0-0 \
+              "$image_url")
+            image_content_type=$(extract_header_value "$image_headers_file" 'content-type')
+
+            if [ "$image_status" != "200" ] && [ "$image_status" != "206" ]; then
+              echo "[$api_name] 検証項目=画像取得Status Status=$image_status (期待値: 200/206)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+            if ! echo "$image_content_type" | grep -qi '^image/'; then
+              echo "[$api_name] 検証項目=画像Content-Type Status=$image_status (期待値: image/*)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+            case "$image_url" in
+              https://*) ;;
+              *)
+                echo "[$api_name] 検証項目=画像URLのHTTPS Status=$image_status (期待値: https://で開始)"
+                attempt=$((attempt + 1))
+                echo "::endgroup::"
+                [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+                continue
+                ;;
+            esac
+
+            echo "[$api_name] すべての検証項目に合格 Status=$status"
+            success=true
+            echo "::endgroup::"
+            break
+          done
+
+          if [ "$success" != "true" ]; then
+            echo "::error::[$api_name] ヘルスチェック失敗（$MAX_ATTEMPTS 回試行）。詳細は上記ログ（API名・検証項目・Statusのみ）を参照。"
+            exit 1
+          fi
+
+      - name: Dog CEO API（ランダム画像）のヘルスチェック
+        id: dog-random
+        if: always()
+        run: |
+          set +e
+          source .github/scripts/api_health_lib.sh
+          api_name="DogCEO-random"
+          # 件数は lib/services/animal_source.dart の kImagesPerRequest(=10) と
+          # 揃える（Cataas 側の同趣旨のコメント参照）。1件取得の監視のままだと
+          # 「10件同時取得だけがAPI側の変更で壊れる」パターンを見逃す。
+          # kImagesPerRequest を変更したらここも合わせて直すこと。
+          url="https://dog.ceo/api/breeds/image/random/${REQUESTED_IMAGE_COUNT}"
+          attempt=1
+          success=false
+
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            echo "::group::[$api_name] attempt $attempt/$MAX_ATTEMPTS"
+
+            headers_file=$(mktemp)
+            body_file=$(mktemp)
+            status=$(curl -sS --connect-timeout 10 --max-time 30 \
+              -o "$body_file" -D "$headers_file" -w '%{http_code}' \
+              -H "Origin: $PWA_ORIGIN" \
+              "$url")
+
+            if [ "$status" != "200" ]; then
+              echo "[$api_name] 検証項目=HTTPステータス Status=$status (期待値: 200)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            if ! check_content_type_json "$headers_file"; then
+              echo "[$api_name] 検証項目=Content-Type Status=$status (期待値: application/json)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            if ! check_cors_allows_origin "$headers_file" "$PWA_ORIGIN"; then
+              echo "[$api_name] 検証項目=CORSヘッダー Status=$status (期待値: Access-Control-Allow-Originが * または $PWA_ORIGIN)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            api_status=$(jq -r '.status // empty' "$body_file")
+            image_url=$(jq -r 'if (.message | type) == "array" and (.message | length) > 0 then .message[0] else empty end' "$body_file")
+
+            if [ "$api_status" != "success" ] || [ -z "$image_url" ]; then
+              echo "[$api_name] 検証項目=レスポンス構造(status/message) Status=$status (期待値: status=success かつ message配列)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            # message[0] だけでなく配列の全要素を検証する。DogSource.parseResponse
+            # は https:// で始まらない要素を例外にせず黙って読み飛ばす仕様のため
+            # （lib/services/animal_source.dart の混在コンテンツ対策）、先頭だけが
+            # 正常URLで残り9件がhttp://や別ドメインに化けていても、この監視が
+            # message[0] しか見ていなければ気付けない。実際のアプリはその場合
+            # 10件要求してほぼ空の山札しか出せなくなるため、全要素をチェックする。
+            invalid_url_count=$(jq -r '
+              if (.message | type) == "array" then
+                ([.message[]
+                  | select((type != "string") or (startswith("https://images.dog.ceo/") | not))
+                ] | length)
+              else -1 end
+            ' "$body_file")
+
+            # 「不正が0件」だけでは、1件しか返らなかった場合も緑になってしまう。
+            # 要求した件数ぶん返っているかを別途数える。
+            message_count=$(jq -r 'if (.message | type) == "array" then (.message | length) else -1 end' "$body_file")
+            if [ "$message_count" != "$REQUESTED_IMAGE_COUNT" ]; then
+              echo "[$api_name] 検証項目=バッチ件数 Status=$status" \
+                "(期待値: message配列が${REQUESTED_IMAGE_COUNT}件 / 実際: ${message_count}件)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            if [ "$invalid_url_count" != "0" ]; then
+              echo "[$api_name] 検証項目=URL構造(https/ドメイン・全要素) Status=$status" \
+                "(期待値: message配列の全要素がhttps://images.dog.ceo/で始まる,実際: 不正/対象外 $invalid_url_count 件)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            # 画像本体のダウンロード確認は負荷配慮のため1枚のみに留める
+            # （Rangeで先頭バイトだけ取得。10枚分ダウンロードする必要はない）。
+            image_headers_file=$(mktemp)
+            image_status=$(curl -sS --connect-timeout 10 --max-time 30 \
+              -o /dev/null -D "$image_headers_file" -w '%{http_code}' \
+              --range 0-0 \
+              "$image_url")
+            image_content_type=$(extract_header_value "$image_headers_file" 'content-type')
+
+            if [ "$image_status" != "200" ] && [ "$image_status" != "206" ]; then
+              echo "[$api_name] 検証項目=画像取得Status Status=$image_status (期待値: 200/206)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+            if ! echo "$image_content_type" | grep -qi '^image/'; then
+              echo "[$api_name] 検証項目=画像Content-Type Status=$image_status (期待値: image/*)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            echo "[$api_name] すべての検証項目に合格 Status=$status"
+            success=true
+            echo "::endgroup::"
+            break
+          done
+
+          if [ "$success" != "true" ]; then
+            echo "::error::[$api_name] ヘルスチェック失敗（$MAX_ATTEMPTS 回試行）。詳細は上記ログ（API名・検証項目・Statusのみ）を参照。"
+            exit 1
+          fi
+
+      - name: Dog CEO API（犬種一覧）のヘルスチェック
+        id: dog-breeds
+        if: always()
+        run: |
+          set +e
+          source .github/scripts/api_health_lib.sh
+          api_name="DogCEO-breeds-list"
+          url="https://dog.ceo/api/breeds/list/all"
+          attempt=1
+          success=false
+
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            echo "::group::[$api_name] attempt $attempt/$MAX_ATTEMPTS"
+
+            headers_file=$(mktemp)
+            body_file=$(mktemp)
+            status=$(curl -sS --connect-timeout 10 --max-time 30 \
+              -o "$body_file" -D "$headers_file" -w '%{http_code}' \
+              -H "Origin: $PWA_ORIGIN" \
+              "$url")
+
+            if [ "$status" != "200" ]; then
+              echo "[$api_name] 検証項目=HTTPステータス Status=$status (期待値: 200)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            # このエンドポイントは他の2つの監視と異なり、Originヘッダーを送るだけで
+            # レスポンスヘッダーを一切検証していなかった。JSONが正常に返り続けても
+            # CORSヘッダーが消えればブラウザ経由の実際のリクエストは失敗するため、
+            # Content-Type / CORS も他の2ステップと同じ基準で見る。
+            if ! check_content_type_json "$headers_file"; then
+              echo "[$api_name] 検証項目=Content-Type Status=$status (期待値: application/json)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            if ! check_cors_allows_origin "$headers_file" "$PWA_ORIGIN"; then
+              echo "[$api_name] 検証項目=CORSヘッダー Status=$status (期待値: Access-Control-Allow-Originが * または $PWA_ORIGIN)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            api_status=$(jq -r '.status // empty' "$body_file")
+            is_map=$(jq -r 'if (.message | type) == "object" then "true" else "false" end' "$body_file")
+
+            if [ "$api_status" != "success" ] || [ "$is_map" != "true" ]; then
+              echo "[$api_name] 検証項目=レスポンス構造(status/message) Status=$status (期待値: status=success かつ messageがMap)"
+              attempt=$((attempt + 1))
+              echo "::endgroup::"
+              [ "$attempt" -le "$MAX_ATTEMPTS" ] && sleep "$RETRY_INTERVAL_SECONDS"
+              continue
+            fi
+
+            echo "[$api_name] すべての検証項目に合格 Status=$status"
+            success=true
+            echo "::endgroup::"
+            break
+          done
+
+          if [ "$success" != "true" ]; then
+            echo "::error::[$api_name] ヘルスチェック失敗（$MAX_ATTEMPTS 回試行）。詳細は上記ログ（API名・検証項目・Statusのみ）を参照。"
+            exit 1
+          fi
+
+      - name: 結果サマリー
+        if: always()
+        run: |
+          {
+            echo "## API Health Check 結果"
+            echo ""
+            echo "| API | 結果 |"
+            echo "| --- | --- |"
+            echo "| Cataas | ${{ steps.cataas.outcome }} |"
+            echo "| Dog CEO (random) | ${{ steps['dog-random'].outcome }} |"
+            echo "| Dog CEO (breeds/list/all) | ${{ steps['dog-breeds'].outcome }} |"
+            echo ""
+            echo "このワークフローの失敗は通知目的であり、本番デプロイを自動停止しません。"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -201,6 +201,11 @@ class DogSource extends AnimalSource {
     final images = <AnimalImage>[];
     for (final item in message) {
       if (item is! String || item.isEmpty) continue;
+      // PWA は HTTPS で配信しているため、http:// の画像は混在コンテンツとして
+      // ブラウザにブロックされ、カードが空白になる。API 側の異常（CDN 設定
+      // 変更等）で紛れ込んだ場合に静かに空白カードを出すより、その1件だけ
+      // 読み飛ばして他の画像は表示できる状態を保つ。
+      if (!item.startsWith('https://')) continue;
       images.add(
         AnimalImage(
           id: item,

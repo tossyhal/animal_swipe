@@ -1,0 +1,8 @@
+{
+  "message": {
+    "hound": ["afghan", "basset", "blood", "walker"],
+    "bulldog": ["boston", "english", "french"],
+    "shiba": []
+  },
+  "status": "success"
+}
