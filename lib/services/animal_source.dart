@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:math';
 
+import '../constants/app_strings.dart';
 import '../models/animal_model.dart';
 import '../models/animal_type.dart';
+import '../models/dog_breed.dart';
 
 /// 1 回のリクエストで取得する画像の件数
 ///
@@ -97,18 +99,53 @@ class CatSource extends AnimalSource {
 }
 
 /// Dog CEO (dog.ceo) から犬画像を取得するソース
+///
+/// ## 犬種名について
+///
+/// 全犬種ランダム API のレスポンスは `{"message": [URL...], "status": "success"}`
+/// だけで、**犬種を表すフィールドは存在しない**。したがって犬種名は
+/// 画像 URL から [DogBreed.fromImageUrl] で復元する。
+/// 復元できない URL は例外にせず「いぬ」へフォールバックする。
 class DogSource extends AnimalSource {
-  const DogSource();
+  /// 明示的に選択された犬種（#32 用）
+  ///
+  /// 指定されている場合は、**URL を再解析せずこの値をそのまま使う**。
+  /// 選択済みの情報の方が URL からの推測より確実だからである。
+  /// 併せて取得先も犬種別エンドポイントへ切り替える。
+  final DogBreed? breed;
 
-  static const String _endpoint = 'https://dog.ceo/api/breeds/image/random';
+  const DogSource({this.breed});
+
+  static const String _randomEndpoint =
+      'https://dog.ceo/api/breeds/image/random';
+  static const String _breedEndpoint = 'https://dog.ceo/api/breed';
 
   @override
   AnimalType get type => AnimalType.dog;
 
   @override
   Uri buildUri(Random random) {
-    // 全犬種ランダム取得。件数はパスに含める仕様
-    return Uri.parse('$_endpoint/$kImagesPerRequest');
+    final selected = breed;
+    if (selected == null) {
+      // 全犬種ランダム取得。件数はパスに含める仕様
+      return Uri.parse('$_randomEndpoint/$kImagesPerRequest');
+    }
+
+    // 犬種指定の取得。サブ犬種はパスをもう 1 段掘る仕様
+    final sub = selected.subBreed;
+    final path = sub == null
+        ? '${selected.breed}/images/random/$kImagesPerRequest'
+        : '${selected.breed}/$sub/images/random/$kImagesPerRequest';
+    return Uri.parse('$_breedEndpoint/$path');
+  }
+
+  /// この URL の画像に付ける犬種名
+  ///
+  /// 明示選択があればそれを、なければ URL から復元する。
+  /// どちらも得られなければ「いぬ」を返す（`null` にはしない）。
+  String _breedLabelFor(String url) {
+    final resolved = breed ?? DogBreed.fromImageUrl(url);
+    return resolved?.displayName ?? AppStrings.animalDog;
   }
 
   @override
@@ -140,6 +177,7 @@ class DogSource extends AnimalSource {
           id: item,
           url: item,
           type: AnimalType.dog,
+          description: _breedLabelFor(item),
           source: 'Dog CEO',
         ),
       );
