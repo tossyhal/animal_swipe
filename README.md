@@ -72,3 +72,38 @@ https://animal-swipe-596cc.web.app/
 
 <br />
 
+
+## エラー監視（Sentry）
+
+未処理例外とクラッシュを Sentry へ送信できます。**DSN が未設定なら Sentry は初期化されず、ログ出力のみ**になるため、開発中やフォークでの動作に外部サービスの設定は不要です。
+
+### 有効にする手順
+
+1. [Sentry](https://sentry.io/) で Flutter プロジェクトを作成し、DSN を取得する
+2. ビルド時に `--dart-define` で渡す
+
+```bash
+flutter build web --release --dart-define=SENTRY_DSN=https://xxxx@oNNN.ingest.sentry.io/NNN
+```
+
+3. GitHub のリポジトリ設定で `SENTRY_DSN` を Actions secret として登録する
+
+CI / デプロイのワークフローは既に `--dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}` を渡すようになっています。**secret が未登録なら空文字が渡り、Sentry は初期化されません**（ビルドは失敗しません）。つまり secret を登録した時点で有効になります。
+
+### DSN の扱いについて
+
+Sentry の DSN は**元からクライアントに埋め込む前提の公開値**です（イベントの投稿にしか使えず、データの読み出しはできません）。したがって `--dart-define` で渡して問題ありません。
+
+ただし **Flutter Web の `--dart-define` はビルド成果物から読み取れるため、秘匿手段ではありません**。同じ方法で API キーなど本当に秘密にすべき値を渡さないでください。その用途にはサーバー側のプロキシ（#45）を使います。
+
+### 有効になる条件
+
+| 条件 | 送信 |
+|---|---|
+| リリースビルド + DSN 設定あり | ✅ |
+| リリースビルド + DSN なし | ❌（ログのみ） |
+| デバッグビルド | ❌（ノイズと無料枠の消費を避けるため） |
+
+### ログレベル
+
+リリースビルドでは `Level.warning` 以上のみ出力します。Web ではブラウザのコンソールにそのまま出るため、デバッグログを残したままにすると利用者に内部情報が見えてしまうためです。

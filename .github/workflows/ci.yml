@@ -100,7 +100,7 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
       - name: Build web
-        run: flutter build web --release
+        run: flutter build web --release --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

@@ -6,29 +6,37 @@ import 'constants/app_strings.dart';
 import 'screens/start_screen.dart';
 import 'screens/swipe_screen.dart';
 import 'services/prefs_service.dart';
+import 'utils/error_reporter.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
-  // Flutterのウィジェットシステムを初期化
+  // Flutterのウィジェットシステムを初期化。
+  // Sentry の初期化にもバインディングが要るため、監視の開始より前に行う。
   WidgetsFlutterBinding.ensureInitialized();
 
-  final futures = await Future.wait([
-    // 画面の向きを縦画面に固定する
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
-    SharedPreferences.getInstance(),
-  ]);
+  // 起動時の初期化ごと監視下に置く。
+  // 画面向きの固定や SharedPreferences の取得が失敗した場合も、
+  // 監視の外で main が終了してしまわないようにする。
+  // runApp も必ずこの中で呼ぶこと（Zone をまたぐと捕捉できなくなる）。
+  await ErrorReporter.runGuarded(() async {
+    final futures = await Future.wait([
+      // 画面の向きを縦画面に固定する
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
+      SharedPreferences.getInstance(),
+    ]);
 
-  // SharedPreferences の初期化
-  final prefs = futures[1] as SharedPreferences;
-  final prefsService = PrefsService(prefs);
+    // SharedPreferences の初期化
+    final prefs = futures[1] as SharedPreferences;
+    final prefsService = PrefsService(prefs);
 
-  runApp(
-    ProviderScope(
-      // prefsServiceProvider を上書きして、[PrefsService] を注入
-      overrides: [prefsServiceProvider.overrideWithValue(prefsService)],
-      child: const AnimalSwipeApp(),
-    ),
-  );
+    runApp(
+      ProviderScope(
+        // prefsServiceProvider を上書きして、[PrefsService] を注入
+        overrides: [prefsServiceProvider.overrideWithValue(prefsService)],
+        child: const AnimalSwipeApp(),
+      ),
+    );
+  });
 }
 
 class AnimalSwipeApp extends ConsumerWidget {
